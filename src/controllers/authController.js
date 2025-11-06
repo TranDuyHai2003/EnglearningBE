@@ -33,8 +33,11 @@ const login = async (req, res) => {
       });
     }
 
+    user.last_login = new Date();
+    await user.save();
+
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { id: user.user_id, email: user.email, role: user.role },
       env.JWT_SECRET,
       { expiresIn: env.JWT_EXPIRE }
     );
@@ -44,10 +47,12 @@ const login = async (req, res) => {
       message: "Login successful",
       data: {
         user: {
-          id: user.id,
+          id: user.user_id,
           email: user.email,
           full_name: user.full_name,
           role: user.role,
+          status: user.status,
+          avatar_url: user.avatar_url,
         },
         token,
       },
@@ -79,16 +84,17 @@ const register = async (req, res) => {
       });
     }
 
+    const allowedRoles = ["student", "instructor"];
     const user = await User.create({
       email,
       password_hash: password,
       full_name,
-      role,
+      role: allowedRoles.includes(role) ? role : "student",
       status: "active",
     });
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { id: user.user_id, email: user.email, role: user.role },
       env.JWT_SECRET,
       { expiresIn: env.JWT_EXPIRE }
     );
@@ -98,10 +104,12 @@ const register = async (req, res) => {
       message: "Registration successful",
       data: {
         user: {
-          id: user.id,
+          id: user.user_id,
           email: user.email,
           full_name: user.full_name,
           role: user.role,
+          status: user.status,
+          avatar_url: user.avatar_url,
         },
         token,
       },
@@ -129,7 +137,7 @@ const getMe = async (req, res) => {
       success: true,
       message: "User found",
       data: {
-        id: user.id,
+        id: user.user_id,
         email: user.email,
         full_name: user.full_name,
         role: user.role,

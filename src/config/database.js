@@ -11,12 +11,12 @@ const sequelize = new Sequelize(env.DB_NAME, env.DB_USER, env.DB_PASSWORD, {
 const initDatabase = async () => {
   try {
     await sequelize.authenticate();
-    console.log("✅ Database authenticated!");
+    console.log("Database connection established");
 
     await sequelize.sync({ alter: true });
-    console.log("✅ Models synced!");
+    console.log("Models synced with database");
   } catch (error) {
-    console.error("❌ Database error:", error);
+    console.error("Database error:", error);
     process.exit(1);
   }
 };
