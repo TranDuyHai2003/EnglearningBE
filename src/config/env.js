@@ -7,7 +7,7 @@ module.exports = {
   DB_PORT: parseInt(process.env.DB_PORT) || 5432,
   DB_NAME: process.env.DB_NAME || "elearning_db",
   DB_USER: process.env.DB_USER || "postgres",
-  DB_PASSWORD: process.env.DB_PASSWORD || "hieu123456",
+  DB_PASSWORD: process.env.DB_PASSWORD || "123456",
   JWT_SECRET: process.env.JWT_SECRET || "secret-key",
   JWT_EXPIRE: process.env.JWT_EXPIRE || "7d",
   FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:3000",

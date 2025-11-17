@@ -26,3 +26,7 @@ Default credential for all generated users (admins, instructors, students) is:
 
 - Email: generated per user (see seed logs for details)
 - Password: `Password123!` (override with `SEED_DEFAULT_PASSWORD` in your environment).
+
+<!-- Dumb folder -->
+
+.\dump_prj.ps1 -SourcePath "." -ExcludeFolders @("node_modules", ".git", ".next", "dist")

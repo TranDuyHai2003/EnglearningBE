@@ -14,6 +14,7 @@ const {
   startQuizAttempt,
   submitQuizAttempt,
   listQuizAttempts,
+  getMyCourseContent,
 } = require("../controllers/learningController");
 
 const router = express.Router();
@@ -68,5 +69,6 @@ router.post(
   submitQuizAttempt
 );
 router.get("/quizzes/:quizId/attempts", listQuizAttempts);
+router.get("/courses/:courseId/content", getMyCourseContent);
 
 module.exports = router;

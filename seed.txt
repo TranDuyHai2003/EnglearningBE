@@ -1,3 +1,4 @@
+﻿//seed.js
 /* eslint-disable no-console */
 require("dotenv").config();
 
@@ -52,18 +53,13 @@ const randomSubset = (array, min = 1, max = array.length) => {
   if (!array.length) return [];
   const safeMin = Math.max(0, Math.min(min, array.length));
   const safeMax = Math.max(safeMin, Math.min(max, array.length));
-  const count =
-    safeMin === safeMax
-      ? safeMin
-      : faker.number.int({ min: safeMin, max: safeMax });
+  const count = safeMin === safeMax ? safeMin : faker.number.int({ min: safeMin, max: safeMax });
   return faker.helpers.shuffle(array).slice(0, count);
 };
 
 const generateEmail = (fullName, domain = "englearning.test") => {
   const safeName = slugify(fullName).replace(/-/g, ".");
-  return `${safeName}.${faker.string
-    .alphanumeric({ length: 4 })
-    .toLowerCase()}@${domain}`;
+  return `${safeName}.${faker.string.alphanumeric({ length: 4 }).toLowerCase()}@${domain}`;
 };
 
 const createOrUpdateUser = async (defaults) => {
@@ -175,10 +171,8 @@ const createInstructorProfiles = async (instructors, supportAdmin) => {
         certificates: faker.lorem.sentence(),
         approval_status: status,
         approved_by: status === "approved" ? supportAdmin.user_id : null,
-        approved_at:
-          status === "approved" ? faker.date.recent({ days: 45 }) : null,
-        rejection_reason:
-          status === "rejected" ? "Need more teaching experience" : null,
+        approved_at: status === "approved" ? faker.date.recent({ days: 45 }) : null,
+        rejection_reason: status === "rejected" ? "Need more teaching experience" : null,
       },
     });
 
@@ -186,10 +180,8 @@ const createInstructorProfiles = async (instructors, supportAdmin) => {
       await profile.update({
         approval_status: status,
         approved_by: status === "approved" ? supportAdmin.user_id : null,
-        approved_at:
-          status === "approved" ? faker.date.recent({ days: 30 }) : null,
-        rejection_reason:
-          status === "rejected" ? "Missing verification documents" : null,
+        approved_at: status === "approved" ? faker.date.recent({ days: 30 }) : null,
+        rejection_reason: status === "rejected" ? "Missing verification documents" : null,
       });
     }
   }
@@ -198,30 +190,12 @@ const createInstructorProfiles = async (instructors, supportAdmin) => {
 const seedCategories = async () => {
   log("Creating categories...");
   const seeds = [
-    {
-      name: "Pronunciation Mastery",
-      description: "Improve your pronunciation and accent.",
-    },
-    {
-      name: "Everyday Speaking",
-      description: "Speaking practice for everyday conversations.",
-    },
-    {
-      name: "Grammar Essentials",
-      description: "Grammar rules and applications.",
-    },
-    {
-      name: "IELTS Preparation",
-      description: "Prepare for IELTS tests with practical lessons.",
-    },
-    {
-      name: "Business English",
-      description: "Professional English for workplace success.",
-    },
-    {
-      name: "Travel English",
-      description: "Essential English for travellers.",
-    },
+    { name: "Pronunciation Mastery", description: "Improve your pronunciation and accent." },
+    { name: "Everyday Speaking", description: "Speaking practice for everyday conversations." },
+    { name: "Grammar Essentials", description: "Grammar rules and applications." },
+    { name: "IELTS Preparation", description: "Prepare for IELTS tests with practical lessons." },
+    { name: "Business English", description: "Professional English for workplace success." },
+    { name: "Travel English", description: "Essential English for travellers." },
   ];
 
   const categories = [];
@@ -272,14 +246,10 @@ const seedTags = async () => {
 const createCourseContent = async (course, tags) => {
   const lessonsForCourse = [];
   const quizzesForCourse = [];
-  const youtubeVideoIds = [
-    "jfKfPfyJRdk", // What is JavaScript?
-    "W6NZfCO5SIk", // JavaScript Tutorial for Beginners
-    "PkZNo7MFNFg", // Learn JavaScript - Full Course for Beginners
-    "hdI2bqOjy3c", // JavaScript Crash Course For Beginners
-    "c-I5S_sTw9o", // Build a Netflix Clone with React
-  ];
-  await course.setTags(randomSubset(tags, 2, 4).map((tag) => tag.tag_id));
+
+  await course.setTags(
+    randomSubset(tags, 2, 4).map((tag) => tag.tag_id)
+  );
 
   const sectionCount = faker.number.int({ min: 2, max: 4 });
   for (let i = 1; i <= sectionCount; i += 1) {
@@ -292,29 +262,7 @@ const createCourseContent = async (course, tags) => {
 
     const lessonCount = faker.number.int({ min: 3, max: 5 });
     for (let j = 1; j <= lessonCount; j += 1) {
-      const lessonType = randomItem([
-        "video",
-        "document",
-        "assignment",
-        "quiz",
-      ]);
-      // const lesson = await Lesson.create({
-      //   section_id: section.section_id,
-      //   title: `Lesson ${i}.${j}: ${faker.company.catchPhrase()}`,
-      //   description: faker.lorem.sentences(2),
-      //   lesson_type: lessonType,
-      //   video_url:
-      //     lessonType === "video"
-      //       ? `https://videos.englearning.test/${slugify(
-      //           course.title
-      //         )}-${i}-${j}.mp4`
-      //       : null,
-      //   video_duration:
-      //     lessonType === "video" ? faker.number.int({ min: 180, max: 900 }) : 0,
-      //   content: lessonType !== "video" ? faker.lorem.paragraphs(2) : null,
-      //   allow_preview: faker.datatype.boolean(),
-      //   display_order: j,
-      // });
+      const lessonType = randomItem(["video", "document", "assignment", "quiz"]);
       const lesson = await Lesson.create({
         section_id: section.section_id,
         title: `Lesson ${i}.${j}: ${faker.company.catchPhrase()}`,
@@ -322,14 +270,17 @@ const createCourseContent = async (course, tags) => {
         lesson_type: lessonType,
         video_url:
           lessonType === "video"
-            ? `https://www.youtube.com/watch?v=${randomItem(youtubeVideoIds)}`
+            ? `https://videos.englearning.test/${slugify(course.title)}-${i}-${j}.mp4`
             : null,
-        video_duration:
-          lessonType === "video" ? faker.number.int({ min: 180, max: 900 }) : 0,
-        content: lessonType !== "video" ? faker.lorem.paragraphs(2) : null,
+        video_duration: lessonType === "video" ? faker.number.int({ min: 180, max: 900 }) : 0,
+        content:
+          lessonType !== "video"
+            ? faker.lorem.paragraphs(2)
+            : null,
         allow_preview: faker.datatype.boolean(),
         display_order: j,
       });
+
       lessonsForCourse.push(lesson);
 
       if (faker.datatype.boolean()) {
@@ -338,19 +289,14 @@ const createCourseContent = async (course, tags) => {
           await LessonResource.create({
             lesson_id: lesson.lesson_id,
             title: `${faker.word.adjective()} Resource ${k + 1}`,
-            file_url: `https://cdn.englearning.test/resources/${
-              lesson.lesson_id
-            }-${k + 1}.pdf`,
+            file_url: `https://cdn.englearning.test/resources/${lesson.lesson_id}-${k + 1}.pdf`,
             file_type: "application/pdf",
             file_size: faker.number.int({ min: 50_000, max: 500_000 }),
           });
         }
       }
 
-      if (
-        lessonType === "quiz" ||
-        faker.datatype.boolean({ probability: 0.2 })
-      ) {
+      if (lessonType === "quiz" || faker.datatype.boolean({ probability: 0.2 })) {
         const quiz = await Quiz.create({
           lesson_id: lesson.lesson_id,
           title: `${lesson.title} Quiz`,
@@ -417,21 +363,16 @@ const createCourses = async (instructors, categories, tags, reviewerId) => {
           ? "approved"
           : faker.helpers.arrayElement(["pending", "approved", "rejected"]);
       const price = faker.number.float({ min: 9, max: 129, multipleOf: 0.5 });
-      const discount = faker.datatype.boolean()
-        ? Math.max(
-            price -
-              faker.number.float({ min: 3, max: price - 1, multipleOf: 0.5 }),
-            0
-          )
-        : null;
+      const discount =
+        faker.datatype.boolean()
+          ? Math.max(price - faker.number.float({ min: 3, max: price - 1, multipleOf: 0.5 }), 0)
+          : null;
 
       const course = await Course.create({
         instructor_id: instructor.user_id,
         category_id: randomItem(categories).category_id,
         title,
-        slug: `${slugify(title)}-${faker.string
-          .alphanumeric({ length: 6 })
-          .toLowerCase()}`,
+        slug: `${slugify(title)}-${faker.string.alphanumeric({ length: 6 }).toLowerCase()}`,
         description: faker.lorem.paragraphs(3),
         thumbnail_url: faker.image.urlPicsumPhotos({ width: 640, height: 360 }),
         level: randomItem(["beginner", "intermediate", "advanced"]),
@@ -442,14 +383,11 @@ const createCourses = async (instructors, categories, tags, reviewerId) => {
         status,
         approval_status: approval,
         reviewed_by: approval === "approved" ? reviewerId : null,
-        reviewed_at:
-          approval === "approved" ? faker.date.recent({ days: 60 }) : null,
-        rejection_reason:
-          approval === "rejected" ? "Content quality below standards" : null,
+        reviewed_at: approval === "approved" ? faker.date.recent({ days: 60 }) : null,
+        rejection_reason: approval === "rejected" ? "Content quality below standards" : null,
         total_students: 0,
         average_rating: 0,
-        published_at:
-          status === "published" ? faker.date.recent({ days: 90 }) : null,
+        published_at: status === "published" ? faker.date.recent({ days: 90 }) : null,
       });
 
       const content = await createCourseContent(course, tags);
@@ -480,8 +418,7 @@ const createEnrollments = async (students, courses) => {
         defaults: {
           completion_percentage: completion,
           status,
-          completed_at:
-            completion === 100 ? faker.date.recent({ days: 40 }) : null,
+          completed_at: completion === 100 ? faker.date.recent({ days: 40 }) : null,
           certificate_issued: completion === 100 && faker.datatype.boolean(),
         },
       });
@@ -501,11 +438,7 @@ const createLessonProgress = async (enrollments, contentByCourse) => {
   for (const enrollment of enrollments) {
     const content = contentByCourse.get(enrollment.course_id);
     if (!content) continue;
-    const subset = randomSubset(
-      content.lessons,
-      1,
-      Math.min(8, content.lessons.length)
-    );
+    const subset = randomSubset(content.lessons, 1, Math.min(8, content.lessons.length));
     for (const lesson of subset) {
       const status = faker.helpers.weightedArrayElement([
         { value: "completed", weight: 6 },
@@ -520,13 +453,9 @@ const createLessonProgress = async (enrollments, contentByCourse) => {
         },
         defaults: {
           status,
-          video_progress:
-            status === "completed"
-              ? 100
-              : faker.number.int({ min: 10, max: 90 }),
+          video_progress: status === "completed" ? 100 : faker.number.int({ min: 10, max: 90 }),
           started_at: faker.date.recent({ days: 30 }),
-          completed_at:
-            status === "completed" ? faker.date.recent({ days: 20 }) : null,
+          completed_at: status === "completed" ? faker.date.recent({ days: 20 }) : null,
         },
       });
     }
@@ -539,10 +468,7 @@ const createTransactions = async (enrollmentsByStudent, courses) => {
   const paymentMethods = ["bank_card", "e_wallet", "bank_transfer"];
   const paymentGateways = ["VNPAY", "Stripe", "MoMo", "PayPal"];
 
-  for (const [
-    studentId,
-    studentEnrollments,
-  ] of enrollmentsByStudent.entries()) {
+  for (const [studentId, studentEnrollments] of enrollmentsByStudent.entries()) {
     if (!studentEnrollments.length) continue;
     const transactionCount = faker.number.int({ min: 1, max: 2 });
 
@@ -554,9 +480,7 @@ const createTransactions = async (enrollmentsByStudent, courses) => {
       );
 
       const courseRecords = chosenEnrollments
-        .map((enrollment) =>
-          courses.find((course) => course.course_id === enrollment.course_id)
-        )
+        .map((enrollment) => courses.find((course) => course.course_id === enrollment.course_id))
         .filter(Boolean);
 
       if (!courseRecords.length) continue;
@@ -594,13 +518,9 @@ const createTransactions = async (enrollmentsByStudent, courses) => {
         payment_method: randomItem(paymentMethods),
         payment_gateway: randomItem(paymentGateways),
         status: paymentStatus,
-        payment_at:
-          paymentStatus === "completed"
-            ? faker.date.recent({ days: 25 })
-            : null,
+        payment_at: paymentStatus === "completed" ? faker.date.recent({ days: 25 }) : null,
         refunded_at:
-          paymentStatus === "completed" &&
-          faker.datatype.boolean({ probability: 0.15 })
+          paymentStatus === "completed" && faker.datatype.boolean({ probability: 0.15 })
             ? faker.date.recent({ days: 5 })
             : null,
       });
@@ -622,8 +542,7 @@ const createReviews = async (enrollments) => {
   log("Creating course reviews...");
   const reviews = [];
   for (const enrollment of enrollments) {
-    if (enrollment.completion_percentage < 40 || !faker.datatype.boolean())
-      continue;
+    if (enrollment.completion_percentage < 40 || !faker.datatype.boolean()) continue;
 
     const [review, created] = await Review.findOrCreate({
       where: {
@@ -651,8 +570,7 @@ const createReviews = async (enrollments) => {
 
   for (const [courseId, ratings] of grouped.entries()) {
     const average =
-      ratings.reduce((sum, value) => sum + value, 0) /
-      Math.max(ratings.length, 1);
+      ratings.reduce((sum, value) => sum + value, 0) / Math.max(ratings.length, 1);
     await Course.update(
       { average_rating: Number(average.toFixed(2)) },
       { where: { course_id: courseId } }
@@ -699,10 +617,9 @@ const createDiscussionsAndMessages = async (
       if (faker.datatype.boolean()) {
         const courseId = lessonMap.get(lesson.lesson_id);
         const instructorId = instructorByCourse.get(courseId);
-        const replyUserId =
-          faker.datatype.boolean() && instructorId
-            ? instructorId
-            : randomItem(instructors).user_id;
+        const replyUserId = faker.datatype.boolean() && instructorId
+          ? instructorId
+          : randomItem(instructors).user_id;
         await QaReply.create({
           discussion_id: discussion.discussion_id,
           user_id: replyUserId,
@@ -740,12 +657,7 @@ const createSupportTickets = async (students, supportAdmin) => {
   log("Creating support tickets...");
   for (let i = 0; i < 12; i += 1) {
     const student = randomItem(students);
-    const status = faker.helpers.arrayElement([
-      "open",
-      "in_progress",
-      "resolved",
-      "closed",
-    ]);
+    const status = faker.helpers.arrayElement(["open", "in_progress", "resolved", "closed"]);
     const ticket = await SupportTicket.create({
       user_id: student.user_id,
       category: randomItem(["technical", "payment", "content", "other"]),
@@ -763,9 +675,7 @@ const createSupportTickets = async (students, supportAdmin) => {
     for (let r = 0; r < replyCount; r += 1) {
       await SupportReply.create({
         ticket_id: ticket.ticket_id,
-        user_id: faker.datatype.boolean()
-          ? student.user_id
-          : supportAdmin.user_id,
+        user_id: faker.datatype.boolean() ? student.user_id : supportAdmin.user_id,
         reply_text: faker.lorem.sentences(2),
       });
     }
@@ -835,9 +745,7 @@ const createQuizAttempts = async (enrollments, contentByCourse) => {
           selected_option_id: chosenOption.option_id,
           answer_text: null,
           is_correct: chosenOption.is_correct,
-          points_earned: chosenOption.is_correct
-            ? Number(questionEntry.question.points || 1)
-            : 0,
+          points_earned: chosenOption.is_correct ? Number(questionEntry.question.points || 1) : 0,
         });
 
         if (chosenOption.is_correct) {
@@ -859,9 +767,7 @@ const createQuizAttempts = async (enrollments, contentByCourse) => {
 const updateCourseTotals = async (courses) => {
   log("Updating course statistics...");
   for (const course of courses) {
-    const studentCount = await Enrollment.count({
-      where: { course_id: course.course_id },
-    });
+    const studentCount = await Enrollment.count({ where: { course_id: course.course_id } });
     await course.update({ total_students: studentCount });
   }
 };
@@ -893,21 +799,12 @@ const main = async () => {
       systemAdmin.user_id
     );
 
-    const { enrollments, enrollmentsByStudent } = await createEnrollments(
-      students,
-      courses
-    );
+    const { enrollments, enrollmentsByStudent } = await createEnrollments(students, courses);
     await createLessonProgress(enrollments, contentByCourse);
     await createTransactions(enrollmentsByStudent, courses);
     await createReviews(enrollments);
     await createQuizAttempts(enrollments, contentByCourse);
-    await createDiscussionsAndMessages(
-      enrollments,
-      contentByCourse,
-      instructors,
-      students,
-      courses
-    );
+    await createDiscussionsAndMessages(enrollments, contentByCourse, instructors, students, courses);
     await createSupportTickets(students, supportAdmin);
     await createSystemSettings();
     await updateCourseTotals(courses);
@@ -923,3 +820,5 @@ const main = async () => {
 };
 
 main();
+
+

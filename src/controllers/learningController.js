@@ -19,7 +19,9 @@ const { getPagination } = require("../utils/pagination");
 const enrollCourse = asyncHandler(async (req, res) => {
   const course = await Course.findByPk(req.body.course_id);
   if (!course) {
-    return res.status(404).json({ success: false, message: "Course not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Course not found" });
   }
   if (course.status !== "published" || course.approval_status !== "approved") {
     return res
@@ -138,7 +140,9 @@ const recordLessonProgress = asyncHandler(async (req, res) => {
     include: [{ model: Section, as: "section" }],
   });
   if (!lesson) {
-    return res.status(404).json({ success: false, message: "Lesson not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Lesson not found" });
   }
 
   const enrollment = await Enrollment.findOne({
@@ -171,7 +175,13 @@ const recordLessonProgress = asyncHandler(async (req, res) => {
   });
 
   const totalLessons = await Lesson.count({
-    include: [{ model: Section, as: "section", where: { course_id: enrollment.course_id } }],
+    include: [
+      {
+        model: Section,
+        as: "section",
+        where: { course_id: enrollment.course_id },
+      },
+    ],
   });
   const completedLessons = await LessonProgress.count({
     where: {
@@ -238,7 +248,9 @@ const getQuiz = asyncHandler(async (req, res) => {
 const upsertQuiz = asyncHandler(async (req, res) => {
   const lesson = await Lesson.findByPk(req.body.lesson_id);
   if (!lesson) {
-    return res.status(404).json({ success: false, message: "Lesson not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Lesson not found" });
   }
   const section = await Section.findByPk(lesson.section_id);
   const course = await Course.findByPk(section.course_id);
@@ -331,7 +343,9 @@ const upsertQuestion = asyncHandler(async (req, res) => {
 const deleteQuestion = asyncHandler(async (req, res) => {
   const question = await Question.findByPk(req.params.questionId);
   if (!question) {
-    return res.status(404).json({ success: false, message: "Question not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Question not found" });
   }
   const quiz = await Quiz.findByPk(question.quiz_id);
   const lesson = await Lesson.findByPk(quiz.lesson_id);
@@ -358,7 +372,9 @@ const startQuizAttempt = asyncHandler(async (req, res) => {
     where: { quiz_id: quiz.quiz_id, student_id: req.user.id },
   });
   if (quiz.max_attempts && attempts >= quiz.max_attempts) {
-    return res.status(400).json({ success: false, message: "Attempt limit reached" });
+    return res
+      .status(400)
+      .json({ success: false, message: "Attempt limit reached" });
   }
 
   const attempt = await QuizAttempt.create({
@@ -373,13 +389,17 @@ const startQuizAttempt = asyncHandler(async (req, res) => {
 const submitQuizAttempt = asyncHandler(async (req, res) => {
   const attempt = await QuizAttempt.findByPk(req.params.attemptId);
   if (!attempt) {
-    return res.status(404).json({ success: false, message: "Attempt not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Attempt not found" });
   }
   if (attempt.student_id !== req.user.id) {
     return res.status(403).json({ success: false, message: "Forbidden" });
   }
   if (attempt.submitted_at) {
-    return res.status(400).json({ success: false, message: "Attempt already submitted" });
+    return res
+      .status(400)
+      .json({ success: false, message: "Attempt already submitted" });
   }
 
   const quiz = await Quiz.findByPk(attempt.quiz_id, {
@@ -393,9 +413,7 @@ const submitQuizAttempt = asyncHandler(async (req, res) => {
   });
 
   const answers = req.body.answers || [];
-  const questionMap = new Map(
-    quiz.questions.map((q) => [q.question_id, q])
-  );
+  const questionMap = new Map(quiz.questions.map((q) => [q.question_id, q]));
 
   const toCreate = [];
   let earned = 0;
@@ -479,6 +497,65 @@ const listQuizAttempts = asyncHandler(async (req, res) => {
   res.json({ success: true, data: attempts });
 });
 
+const getMyCourseContent = asyncHandler(async (req, res) => {
+  const courseId = parseInt(req.params.courseId, 10);
+  const studentId = req.user.id;
+
+  const enrollment = await Enrollment.findOne({
+    where: {
+      student_id: studentId,
+      course_id: courseId,
+    },
+    include: [
+      {
+        model: Course,
+        as: "course",
+        include: [
+          {
+            model: Section,
+            as: "sections",
+            include: [
+              {
+                model: Lesson,
+                as: "lessons",
+                include: [{ model: LessonResource, as: "resources" }],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        model: LessonProgress,
+        as: "lessonProgress",
+      },
+    ],
+    // === SỬA LẠI ĐOẠN NÀY ===
+    order: [
+      [
+        { model: Course, as: "course" },
+        { model: Section, as: "sections" },
+        "display_order",
+        "ASC",
+      ],
+      [
+        { model: Course, as: "course" },
+        { model: Section, as: "sections" },
+        { model: Lesson, as: "lessons" },
+        "display_order",
+        "ASC",
+      ],
+    ],
+    // === KẾT THÚC PHẦN SỬA ===
+  });
+
+  if (!enrollment) {
+    return res
+      .status(404)
+      .json({ success: false, message: "Bạn chưa ghi danh vào khóa học này." });
+  }
+
+  res.json({ success: true, data: enrollment });
+});
 module.exports = {
   enrollCourse,
   listEnrollments,
@@ -492,4 +569,5 @@ module.exports = {
   startQuizAttempt,
   submitQuizAttempt,
   listQuizAttempts,
+  getMyCourseContent,
 };
