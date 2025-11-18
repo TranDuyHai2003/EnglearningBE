@@ -6,6 +6,8 @@ const {
   reviewProfile,
   getInstructorCourses,
   getMyProfile,
+  getDashboardSummary,
+  getActionItems,
 } = require("../controllers/instructorController");
 const { authMiddleware } = require("../middleware/auth");
 const { allowRoles, minRole } = require("../middleware/roles");
@@ -23,5 +25,17 @@ router.patch("/profiles", allowRoles("student", "instructor"), updateProfile);
 router.get("/profiles", minRole("support_admin"), listProfiles);
 router.patch("/profiles/:id/review", minRole("support_admin"), reviewProfile);
 router.get("/:id/courses", getInstructorCourses);
+
+// Instructor Dashboard APIs
+router.get(
+  "/dashboard/summary",
+  allowRoles("instructor", "system_admin"),
+  getDashboardSummary
+);
+router.get(
+  "/dashboard/action-items",
+  allowRoles("instructor", "system_admin"),
+  getActionItems
+);
 
 module.exports = router;

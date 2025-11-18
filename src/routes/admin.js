@@ -10,6 +10,8 @@ const {
   createSupportTicket,
   updateSupportTicket,
   replySupportTicket,
+  getActionItems,
+  getMetricsTimeseries,
 } = require("../controllers/adminController");
 
 const router = express.Router();
@@ -17,6 +19,8 @@ const router = express.Router();
 router.use(authMiddleware);
 
 router.get("/dashboard/summary", minRole("support_admin"), dashboardSummary);
+router.get("/action-items", minRole("support_admin"), getActionItems);
+router.get("/metrics/timeseries", minRole("support_admin"), getMetricsTimeseries);
 
 router.get("/settings", minRole("support_admin"), listSettings);
 router.post("/settings", minRole("support_admin"), upsertSetting);

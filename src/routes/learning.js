@@ -15,6 +15,9 @@ const {
   submitQuizAttempt,
   listQuizAttempts,
   getMyCourseContent,
+  getResumeCourse,
+  getMyStats,
+  getMyActivityFeed,
 } = require("../controllers/learningController");
 
 const router = express.Router();
@@ -70,5 +73,18 @@ router.post(
 );
 router.get("/quizzes/:quizId/attempts", listQuizAttempts);
 router.get("/courses/:courseId/content", getMyCourseContent);
+
+// Student Dashboard APIs
+router.get(
+  "/resumecourse",
+  allowRoles("student", "system_admin"),
+  getResumeCourse
+);
+router.get("/my-stats", allowRoles("student", "system_admin"), getMyStats);
+router.get(
+  "/my-activity-feed",
+  allowRoles("student", "system_admin"),
+  getMyActivityFeed
+);
 
 module.exports = router;

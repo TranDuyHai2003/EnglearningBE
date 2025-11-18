@@ -12,6 +12,8 @@ const {
   StudentAnswer,
   Section,
   LessonResource,
+  User,
+  Transaction,
 } = require("../models");
 const asyncHandler = require("../utils/asyncHandler");
 const { getPagination } = require("../utils/pagination");
@@ -556,6 +558,245 @@ const getMyCourseContent = asyncHandler(async (req, res) => {
 
   res.json({ success: true, data: enrollment });
 });
+
+const getResumeCourse = asyncHandler(async (req, res) => {
+  const studentId = req.user.id;
+
+  const recentEnrollment = await Enrollment.findOne({
+    where: { student_id: studentId },
+    include: [
+      {
+        model: Course,
+        as: "course",
+        include: [
+          {
+            model: User,
+            as: "instructor",
+            attributes: ["user_id", "full_name", "avatar_url"],
+          },
+        ],
+      },
+      {
+        model: LessonProgress,
+        as: "lessonProgress",
+        order: [["updated_at", "DESC"]],
+        limit: 1,
+      },
+    ],
+    order: [["updated_at", "DESC"]],
+  });
+
+  if (!recentEnrollment) {
+    return res.status(404).json({
+      success: false,
+      message: "No courses found",
+    });
+  }
+
+  res.json({
+    success: true,
+    data: {
+      enrollment: recentEnrollment,
+      last_accessed_at:
+        recentEnrollment.lessonProgress?.[0]?.updated_at ||
+        recentEnrollment.updated_at,
+    },
+  });
+});
+
+const getMyStats = asyncHandler(async (req, res) => {
+  const studentId = req.user.id;
+
+  const [
+    totalEnrolled,
+    totalCompleted,
+    completedLessons,
+    totalSpent,
+    averageProgress,
+  ] = await Promise.all([
+    Enrollment.count({
+      where: { student_id: studentId },
+    }),
+    Enrollment.count({
+      where: { student_id: studentId, status: "completed" },
+    }),
+    LessonProgress.findAll({
+      where: { status: "completed" },
+      include: [
+        {
+          model: Enrollment,
+          as: "enrollment",
+          where: { student_id: studentId },
+          attributes: [],
+        },
+        {
+          model: Lesson,
+          as: "lesson",
+          attributes: ["video_duration"],
+        },
+      ],
+      attributes: ["lesson_id"],
+    }),
+    Transaction.sum("final_amount", {
+      where: { student_id: studentId, status: "completed" },
+    }),
+    Enrollment.findOne({
+      where: { student_id: studentId },
+      attributes: [
+        [sequelize.fn("AVG", sequelize.col("completion_percentage")), "avg"],
+      ],
+      raw: true,
+    }),
+  ]);
+
+  const totalHoursLearned = completedLessons.reduce((sum, progress) => {
+    return sum + Number(progress.lesson?.video_duration || 0);
+  }, 0);
+
+  const totalMinutesLearned = Math.floor(totalHoursLearned / 60);
+
+  res.json({
+    success: true,
+    data: {
+      total_courses_enrolled: totalEnrolled,
+      total_courses_completed: totalCompleted,
+      total_hours_learned: Number((totalMinutesLearned / 60).toFixed(2)),
+      total_minutes_learned: totalMinutesLearned,
+      total_spent: Number(totalSpent || 0),
+      average_progress: Number(averageProgress?.avg || 0).toFixed(2),
+      certificates_earned: totalCompleted,
+    },
+  });
+});
+
+const getMyActivityFeed = asyncHandler(async (req, res) => {
+  const studentId = req.user.id;
+  const { limit = 10 } = req.query;
+
+  const activities = [];
+
+  const [recentLessons, recentQuizzes, recentEnrollments] = await Promise.all([
+    LessonProgress.findAll({
+      where: { status: "completed" },
+      include: [
+        {
+          model: Enrollment,
+          as: "enrollment",
+          where: { student_id: studentId },
+          attributes: ["enrollment_id"],
+        },
+        {
+          model: Lesson,
+          as: "lesson",
+          attributes: ["lesson_id", "title"],
+          include: [
+            {
+              model: Section,
+              as: "section",
+              attributes: ["section_id"],
+              include: [
+                {
+                  model: Course,
+                  as: "course",
+                  attributes: ["course_id", "title"],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      order: [["completed_at", "DESC"]],
+      limit: parseInt(limit),
+    }),
+    QuizAttempt.findAll({
+      where: { student_id: studentId, submitted_at: { [Op.ne]: null } },
+      include: [
+        {
+          model: Quiz,
+          as: "quiz",
+          attributes: ["quiz_id", "title"],
+          include: [
+            {
+              model: Lesson,
+              as: "lesson",
+              attributes: ["lesson_id"],
+              include: [
+                {
+                  model: Section,
+                  as: "section",
+                  attributes: ["section_id"],
+                  include: [
+                    {
+                      model: Course,
+                      as: "course",
+                      attributes: ["course_id", "title"],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      order: [["submitted_at", "DESC"]],
+      limit: parseInt(limit),
+    }),
+    Enrollment.findAll({
+      where: { student_id: studentId },
+      include: [
+        {
+          model: Course,
+          as: "course",
+          attributes: ["course_id", "title"],
+        },
+      ],
+      order: [["enrolled_at", "DESC"]],
+      limit: parseInt(limit),
+    }),
+  ]);
+
+  recentLessons.forEach((progress) => {
+    activities.push({
+      type: "lesson_completed",
+      title: `Completed lesson: ${progress.lesson?.title}`,
+      course_id: progress.lesson?.section?.course?.course_id,
+      course_title: progress.lesson?.section?.course?.title,
+      lesson_id: progress.lesson?.lesson_id,
+      timestamp: progress.completed_at,
+    });
+  });
+
+  recentQuizzes.forEach((attempt) => {
+    activities.push({
+      type: "quiz_submitted",
+      title: `Scored ${attempt.score}% on quiz: ${attempt.quiz?.title}`,
+      course_id: attempt.quiz?.lesson?.section?.course?.course_id,
+      course_title: attempt.quiz?.lesson?.section?.course?.title,
+      quiz_id: attempt.quiz?.quiz_id,
+      score: attempt.score,
+      passed: attempt.passed,
+      timestamp: attempt.submitted_at,
+    });
+  });
+
+  recentEnrollments.forEach((enrollment) => {
+    activities.push({
+      type: "course_enrolled",
+      title: `Enrolled in: ${enrollment.course?.title}`,
+      course_id: enrollment.course?.course_id,
+      course_title: enrollment.course?.title,
+      timestamp: enrollment.enrolled_at,
+    });
+  });
+
+  activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  res.json({
+    success: true,
+    data: activities.slice(0, parseInt(limit)),
+  });
+});
+
 module.exports = {
   enrollCourse,
   listEnrollments,
@@ -570,4 +811,7 @@ module.exports = {
   submitQuizAttempt,
   listQuizAttempts,
   getMyCourseContent,
+  getResumeCourse,
+  getMyStats,
+  getMyActivityFeed,
 };

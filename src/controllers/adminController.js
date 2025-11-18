@@ -7,9 +7,11 @@ const {
   SystemSetting,
   SupportTicket,
   SupportReply,
+  sequelize,
 } = require("../models");
 const asyncHandler = require("../utils/asyncHandler");
 const { getPagination } = require("../utils/pagination");
+const { Op } = require("sequelize");
 
 const dashboardSummary = asyncHandler(async (req, res) => {
   const [
@@ -170,6 +172,187 @@ const replySupportTicket = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, data: reply });
 });
 
+const getActionItems = asyncHandler(async (req, res) => {
+  const [pendingCourses, pendingInstructors] = await Promise.all([
+    Course.findAll({
+      where: { approval_status: "pending" },
+      include: [
+        {
+          model: User,
+          as: "instructor",
+          attributes: ["user_id", "full_name", "email", "avatar_url"],
+        },
+      ],
+      order: [["created_at", "DESC"]],
+      limit: 5,
+    }),
+    InstructorProfile.findAll({
+      where: { approval_status: "pending" },
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["user_id", "full_name", "email", "avatar_url"],
+        },
+      ],
+      order: [["created_at", "DESC"]],
+      limit: 5,
+    }),
+  ]);
+
+  res.json({
+    success: true,
+    data: {
+      pending_courses: pendingCourses,
+      pending_instructors: pendingInstructors,
+    },
+  });
+});
+
+const getMetricsTimeseries = asyncHandler(async (req, res) => {
+  const { metric = "revenue", period = "month" } = req.query;
+
+  const allowedMetrics = [
+    "revenue",
+    "users",
+    "enrollments",
+    "courses",
+    "transactions",
+  ];
+  const allowedPeriods = ["day", "week", "month"];
+
+  if (!allowedMetrics.includes(metric)) {
+    return res.status(400).json({
+      success: false,
+      message: `Invalid metric. Allowed values: ${allowedMetrics.join(", ")}`,
+    });
+  }
+
+  if (!allowedPeriods.includes(period)) {
+    return res.status(400).json({
+      success: false,
+      message: `Invalid period. Allowed values: ${allowedPeriods.join(", ")}`,
+    });
+  }
+
+  const dateFormat = {
+    day: "YYYY-MM-DD",
+    week: "IYYY-IW",
+    month: "YYYY-MM",
+  }[period];
+
+  const truncPeriod = {
+    day: "day",
+    week: "week",
+    month: "month",
+  }[period];
+
+  const intervalValue = {
+    day: "30 days",
+    week: "12 weeks",
+    month: "12 months",
+  }[period];
+
+  let queryResult;
+
+  if (metric === "revenue") {
+    queryResult = await sequelize.query(
+      `
+      SELECT
+        TO_CHAR(DATE_TRUNC(:truncPeriod, payment_at), :dateFormat) as period,
+        SUM(final_amount) as value
+      FROM transactions
+      WHERE status = 'completed'
+        AND payment_at IS NOT NULL
+        AND payment_at >= NOW() - INTERVAL :intervalValue
+      GROUP BY DATE_TRUNC(:truncPeriod, payment_at)
+      ORDER BY period ASC
+    `,
+      {
+        replacements: { truncPeriod, dateFormat, intervalValue },
+        type: sequelize.QueryTypes.SELECT,
+      }
+    );
+  } else if (metric === "users") {
+    queryResult = await sequelize.query(
+      `
+      SELECT
+        TO_CHAR(DATE_TRUNC(:truncPeriod, created_at), :dateFormat) as period,
+        COUNT(*) as value
+      FROM users
+      WHERE created_at >= NOW() - INTERVAL :intervalValue
+      GROUP BY DATE_TRUNC(:truncPeriod, created_at)
+      ORDER BY period ASC
+    `,
+      {
+        replacements: { truncPeriod, dateFormat, intervalValue },
+        type: sequelize.QueryTypes.SELECT,
+      }
+    );
+  } else if (metric === "enrollments") {
+    queryResult = await sequelize.query(
+      `
+      SELECT
+        TO_CHAR(DATE_TRUNC(:truncPeriod, enrolled_at), :dateFormat) as period,
+        COUNT(*) as value
+      FROM enrollments
+      WHERE enrolled_at >= NOW() - INTERVAL :intervalValue
+      GROUP BY DATE_TRUNC(:truncPeriod, enrolled_at)
+      ORDER BY period ASC
+    `,
+      {
+        replacements: { truncPeriod, dateFormat, intervalValue },
+        type: sequelize.QueryTypes.SELECT,
+      }
+    );
+  } else if (metric === "courses") {
+    queryResult = await sequelize.query(
+      `
+      SELECT
+        TO_CHAR(DATE_TRUNC(:truncPeriod, created_at), :dateFormat) as period,
+        COUNT(*) as value
+      FROM courses
+      WHERE created_at >= NOW() - INTERVAL :intervalValue
+      GROUP BY DATE_TRUNC(:truncPeriod, created_at)
+      ORDER BY period ASC
+    `,
+      {
+        replacements: { truncPeriod, dateFormat, intervalValue },
+        type: sequelize.QueryTypes.SELECT,
+      }
+    );
+  } else if (metric === "transactions") {
+    queryResult = await sequelize.query(
+      `
+      SELECT
+        TO_CHAR(DATE_TRUNC(:truncPeriod, created_at), :dateFormat) as period,
+        COUNT(*) as value
+      FROM transactions
+      WHERE status = 'completed'
+        AND created_at >= NOW() - INTERVAL :intervalValue
+      GROUP BY DATE_TRUNC(:truncPeriod, created_at)
+      ORDER BY period ASC
+    `,
+      {
+        replacements: { truncPeriod, dateFormat, intervalValue },
+        type: sequelize.QueryTypes.SELECT,
+      }
+    );
+  }
+
+  res.json({
+    success: true,
+    data: {
+      metric,
+      period,
+      timeseries: queryResult.map((item) => ({
+        period: item.period,
+        value: Number(item.value),
+      })),
+    },
+  });
+});
+
 module.exports = {
   dashboardSummary,
   listSettings,
@@ -179,4 +362,6 @@ module.exports = {
   createSupportTicket,
   updateSupportTicket,
   replySupportTicket,
+  getActionItems,
+  getMetricsTimeseries,
 };

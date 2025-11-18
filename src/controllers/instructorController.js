@@ -1,6 +1,17 @@
-const { InstructorProfile, User, Course } = require("../models");
+const {
+  InstructorProfile,
+  User,
+  Course,
+  Enrollment,
+  TransactionDetail,
+  Transaction,
+  Review,
+  QaDiscussion,
+  sequelize,
+} = require("../models");
 const asyncHandler = require("../utils/asyncHandler");
 const { getPagination } = require("../utils/pagination");
+const { Op } = require("sequelize");
 
 const getMyProfile = asyncHandler(async (req, res) => {
   // req.user.id được lấy từ token đã được authMiddleware giải mã
@@ -151,6 +162,221 @@ const getInstructorCourses = asyncHandler(async (req, res) => {
   res.json({ success: true, data: courses });
 });
 
+const getDashboardSummary = asyncHandler(async (req, res) => {
+  const instructorId = req.user.id;
+
+  const instructorCourses = await Course.findAll({
+    where: { instructor_id: instructorId },
+    attributes: ["course_id", "total_students", "average_rating"],
+  });
+
+  const courseIds = instructorCourses.map((c) => c.course_id);
+
+  if (courseIds.length === 0) {
+    return res.json({
+      success: true,
+      data: {
+        total_students: 0,
+        total_revenue: 0,
+        average_rating: 0,
+        pending_questions_count: 0,
+        total_courses: 0,
+        total_enrollments: 0,
+        revenue_over_time: [],
+        enrollments_over_time: [],
+      },
+    });
+  }
+
+  const [
+    totalEnrollments,
+    totalRevenue,
+    pendingQuestions,
+    revenueOverTime,
+    enrollmentsOverTime,
+  ] = await Promise.all([
+    Enrollment.count({
+      where: { course_id: { [Op.in]: courseIds } },
+    }),
+    TransactionDetail.sum("final_price", {
+      where: { course_id: { [Op.in]: courseIds } },
+      include: [
+        {
+          model: Transaction,
+          as: "transaction",
+          where: { status: "completed" },
+          attributes: [],
+        },
+      ],
+    }),
+    QaDiscussion.count({
+      where: {
+        course_id: { [Op.in]: courseIds },
+        parent_discussion_id: null,
+        is_instructor_reply: false,
+      },
+      include: [
+        {
+          model: QaDiscussion,
+          as: "replies",
+          required: false,
+        },
+      ],
+      having: sequelize.literal(
+        '(SELECT COUNT(*) FROM "qa_discussions" AS "reply" WHERE "reply"."parent_discussion_id" = "QaDiscussion"."discussion_id" AND "reply"."is_instructor_reply" = true) = 0'
+      ),
+    }),
+    sequelize.query(
+      `
+      SELECT
+        TO_CHAR(DATE_TRUNC('month', t.payment_at), 'YYYY-MM') as month,
+        SUM(td.final_price) as revenue
+      FROM transactions t
+      JOIN transaction_details td ON t.transaction_id = td.transaction_id
+      WHERE t.status = 'completed'
+        AND td.course_id IN (:courseIds)
+        AND t.payment_at IS NOT NULL
+        AND t.payment_at >= NOW() - INTERVAL '12 months'
+      GROUP BY DATE_TRUNC('month', t.payment_at)
+      ORDER BY month ASC
+    `,
+      {
+        replacements: { courseIds },
+        type: sequelize.QueryTypes.SELECT,
+      }
+    ),
+    sequelize.query(
+      `
+      SELECT
+        TO_CHAR(DATE_TRUNC('month', enrolled_at), 'YYYY-MM') as month,
+        COUNT(*) as enrollments
+      FROM enrollments
+      WHERE course_id IN (:courseIds)
+        AND enrolled_at >= NOW() - INTERVAL '12 months'
+      GROUP BY DATE_TRUNC('month', enrolled_at)
+      ORDER BY month ASC
+    `,
+      {
+        replacements: { courseIds },
+        type: sequelize.QueryTypes.SELECT,
+      }
+    ),
+  ]);
+
+  const totalStudents = instructorCourses.reduce(
+    (sum, course) => sum + Number(course.total_students || 0),
+    0
+  );
+
+  const averageRating =
+    instructorCourses.reduce(
+      (sum, course) => sum + Number(course.average_rating || 0),
+      0
+    ) / instructorCourses.length;
+
+  res.json({
+    success: true,
+    data: {
+      total_students: totalStudents,
+      total_revenue: Number(totalRevenue || 0),
+      average_rating: Number(averageRating.toFixed(2)),
+      pending_questions_count: pendingQuestions,
+      total_courses: instructorCourses.length,
+      total_enrollments: totalEnrollments,
+      revenue_over_time: revenueOverTime.map((item) => ({
+        month: item.month,
+        revenue: Number(item.revenue),
+      })),
+      enrollments_over_time: enrollmentsOverTime.map((item) => ({
+        month: item.month,
+        enrollments: Number(item.enrollments),
+      })),
+    },
+  });
+});
+
+const getActionItems = asyncHandler(async (req, res) => {
+  const instructorId = req.user.id;
+
+  const instructorCourses = await Course.findAll({
+    where: { instructor_id: instructorId },
+    attributes: ["course_id"],
+  });
+
+  const courseIds = instructorCourses.map((c) => c.course_id);
+
+  if (courseIds.length === 0) {
+    return res.json({
+      success: true,
+      data: {
+        pending_questions: [],
+        recent_reviews: [],
+      },
+    });
+  }
+
+  const [pendingQuestions, recentReviews] = await Promise.all([
+    QaDiscussion.findAll({
+      where: {
+        course_id: { [Op.in]: courseIds },
+        parent_discussion_id: null,
+        is_instructor_reply: false,
+      },
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["user_id", "full_name", "avatar_url"],
+        },
+        {
+          model: Course,
+          as: "course",
+          attributes: ["course_id", "title"],
+        },
+        {
+          model: QaDiscussion,
+          as: "replies",
+          required: false,
+          where: { is_instructor_reply: true },
+        },
+      ],
+      order: [["created_at", "DESC"]],
+      limit: 5,
+      having: sequelize.literal(
+        '(SELECT COUNT(*) FROM "qa_discussions" AS "reply" WHERE "reply"."parent_discussion_id" = "QaDiscussion"."discussion_id" AND "reply"."is_instructor_reply" = true) = 0'
+      ),
+    }),
+    Review.findAll({
+      where: {
+        course_id: { [Op.in]: courseIds },
+        status: "approved",
+      },
+      include: [
+        {
+          model: User,
+          as: "student",
+          attributes: ["user_id", "full_name", "avatar_url"],
+        },
+        {
+          model: Course,
+          as: "course",
+          attributes: ["course_id", "title"],
+        },
+      ],
+      order: [["created_at", "DESC"]],
+      limit: 5,
+    }),
+  ]);
+
+  res.json({
+    success: true,
+    data: {
+      pending_questions: pendingQuestions,
+      recent_reviews: recentReviews,
+    },
+  });
+});
+
 module.exports = {
   createProfile,
   updateProfile,
@@ -158,4 +384,6 @@ module.exports = {
   reviewProfile,
   getInstructorCourses,
   getMyProfile,
+  getDashboardSummary,
+  getActionItems,
 };
