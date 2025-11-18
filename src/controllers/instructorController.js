@@ -2,6 +2,24 @@ const { InstructorProfile, User, Course } = require("../models");
 const asyncHandler = require("../utils/asyncHandler");
 const { getPagination } = require("../utils/pagination");
 
+const getMyProfile = asyncHandler(async (req, res) => {
+  // req.user.id được lấy từ token đã được authMiddleware giải mã
+  const profile = await InstructorProfile.findOne({
+    where: { user_id: req.user.id },
+    include: [{ model: User, as: "user", attributes: ["full_name", "email"] }],
+  });
+
+  if (!profile) {
+    // Trả về 404 nếu không tìm thấy, đúng với mong đợi của frontend
+    return res.status(404).json({
+      success: false,
+      message: "Instructor profile not found for the current user.",
+    });
+  }
+
+  res.json({ success: true, data: profile });
+});
+
 // src/controllers/instructorController.js
 
 const createProfile = asyncHandler(async (req, res) => {
@@ -17,12 +35,10 @@ const createProfile = asyncHandler(async (req, res) => {
       where: { user_id: req.user.id, approval_status: "approved" },
     });
     if (existingApprovedProfile) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Bạn đã là một giảng viên đã được phê duyệt.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Bạn đã là một giảng viên đã được phê duyệt.",
+      });
     }
   }
   // === Kết thúc bổ sung ===
@@ -141,4 +157,5 @@ module.exports = {
   listProfiles,
   reviewProfile,
   getInstructorCourses,
+  getMyProfile,
 };

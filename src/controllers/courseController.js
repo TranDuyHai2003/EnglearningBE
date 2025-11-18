@@ -65,13 +65,19 @@ const listCourses = asyncHandler(async (req, res) => {
     ];
   }
 
-  if (req.user.role === "instructor") {
+  // ===================== SỬA ĐỔI Ở ĐÂY =====================
+  // Sử dụng optional chaining (?.) để kiểm tra req.user có tồn tại không
+  // Nếu req.user là undefined (khách truy cập), các điều kiện này sẽ không chạy và không gây lỗi
+  if (req.user?.role === "instructor") {
     where.instructor_id = req.user.id;
   }
-  if (req.user.role === "student") {
+
+  // Đối với student, hoặc khách truy cập đã có sẵn filter, ta đảm bảo chỉ thấy khóa học đã xuất bản
+  if (req.user?.role === "student") {
     where.status = "published";
     where.approval_status = "approved";
   }
+  // ===================== KẾT THÚC SỬA ĐỔI =====================
 
   const result = await Course.findAndCountAll({
     where,
@@ -85,10 +91,17 @@ const listCourses = asyncHandler(async (req, res) => {
         model: Category,
         as: "category",
       },
+      // Thêm include instructor để lấy tên giảng viên
+      {
+        model: User,
+        as: "instructor",
+        attributes: ["user_id", "full_name"],
+      },
     ],
     limit,
     offset,
     order: [["created_at", "DESC"]],
+    distinct: true, // Thêm distinct để tránh lỗi count khi có include many-to-many
   });
 
   res.json({
@@ -141,7 +154,9 @@ const createCourse = asyncHandler(async (req, res) => {
 const updateCourse = asyncHandler(async (req, res) => {
   const course = await Course.findByPk(req.params.id);
   if (!course) {
-    return res.status(404).json({ success: false, message: "Course not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Course not found" });
   }
 
   if (
@@ -190,9 +205,11 @@ const updateCourse = asyncHandler(async (req, res) => {
   res.json({ success: true, data: updatedCourse });
 });
 
+// controllers/courseController.js
+
 const getCourse = asyncHandler(async (req, res) => {
   const course = await Course.findByPk(req.params.id, {
-    include: courseInclude,
+    include: courseInclude, // courseInclude đã được định nghĩa ở đầu file
     order: [
       [{ model: Section, as: "sections" }, "display_order", "ASC"],
       [
@@ -204,39 +221,61 @@ const getCourse = asyncHandler(async (req, res) => {
     ],
   });
   if (!course) {
-    return res.status(404).json({ success: false, message: "Course not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Course not found" });
   }
 
-  if (
-    req.user.role === "student" &&
-    (course.status !== "published" || course.approval_status !== "approved")
-  ) {
-    return res.status(403).json({ success: false, message: "Forbidden" });
+  // ===================== SỬA ĐỔI Ở ĐÂY =====================
+  // Kiểm tra vai trò của người dùng một cách an toàn
+  const userRole = req.user?.role;
+
+  // Nếu người dùng là student hoặc là khách (userRole là undefined)
+  // thì chỉ cho phép xem các khóa học đã được duyệt và xuất bản.
+  if (userRole === "student" || !userRole) {
+    if (
+      course.status !== "published" ||
+      course.approval_status !== "approved"
+    ) {
+      // Trả về 404 thay vì 403 để không tiết lộ sự tồn tại của khóa học chưa xuất bản
+      return res
+        .status(404)
+        .json({ success: false, message: "Course not found" });
+    }
   }
+  // Các vai trò khác (instructor, admin) sẽ không bị ảnh hưởng bởi điều kiện trên
+  // và có thể xem khóa học dựa trên các quyền khác (logic này đã có trong các hàm update/delete)
+  // ===================== KẾT THÚC SỬA ĐỔI =====================
 
   res.json({ success: true, data: course });
 });
-
 const changeCourseStatus = asyncHandler(async (req, res) => {
   const course = await Course.findByPk(req.params.id);
   if (!course) {
-    return res.status(404).json({ success: false, message: "Course not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Course not found" });
   }
 
   const { status, approval_status, rejection_reason } = req.body;
 
-  if (status && !["draft", "pending", "published", "rejected", "archived"].includes(status)) {
+  if (
+    status &&
+    !["draft", "pending", "published", "rejected", "archived"].includes(status)
+  ) {
     return res.status(400).json({ success: false, message: "Invalid status" });
   }
 
-  if (approval_status && !["pending", "approved", "rejected"].includes(approval_status)) {
-    return res.status(400).json({ success: false, message: "Invalid approval status" });
+  if (
+    approval_status &&
+    !["pending", "approved", "rejected"].includes(approval_status)
+  ) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Invalid approval status" });
   }
 
-  if (
-    req.user.role === "instructor" &&
-    req.user.id !== course.instructor_id
-  ) {
+  if (req.user.role === "instructor" && req.user.id !== course.instructor_id) {
     return res.status(403).json({ success: false, message: "Forbidden" });
   }
 
@@ -260,8 +299,7 @@ const changeCourseStatus = asyncHandler(async (req, res) => {
       approval_status && approval_status !== "pending"
         ? new Date()
         : course.reviewed_at,
-    published_at:
-      status === "published" ? new Date() : course.published_at,
+    published_at: status === "published" ? new Date() : course.published_at,
   });
 
   res.json({ success: true, data: course });
@@ -270,7 +308,9 @@ const changeCourseStatus = asyncHandler(async (req, res) => {
 const deleteCourse = asyncHandler(async (req, res) => {
   const course = await Course.findByPk(req.params.id);
   if (!course) {
-    return res.status(404).json({ success: false, message: "Course not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Course not found" });
   }
 
   if (
@@ -287,7 +327,9 @@ const deleteCourse = asyncHandler(async (req, res) => {
 const createSection = asyncHandler(async (req, res) => {
   const course = await Course.findByPk(req.params.courseId);
   if (!course) {
-    return res.status(404).json({ success: false, message: "Course not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Course not found" });
   }
 
   if (
@@ -310,7 +352,9 @@ const createSection = asyncHandler(async (req, res) => {
 const updateSection = asyncHandler(async (req, res) => {
   const section = await Section.findByPk(req.params.sectionId);
   if (!section) {
-    return res.status(404).json({ success: false, message: "Section not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Section not found" });
   }
 
   const course = await Course.findByPk(section.course_id);
@@ -333,7 +377,9 @@ const updateSection = asyncHandler(async (req, res) => {
 const deleteSection = asyncHandler(async (req, res) => {
   const section = await Section.findByPk(req.params.sectionId);
   if (!section) {
-    return res.status(404).json({ success: false, message: "Section not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Section not found" });
   }
   const course = await Course.findByPk(section.course_id);
   if (
@@ -350,7 +396,9 @@ const deleteSection = asyncHandler(async (req, res) => {
 const createLesson = asyncHandler(async (req, res) => {
   const section = await Section.findByPk(req.params.sectionId);
   if (!section) {
-    return res.status(404).json({ success: false, message: "Section not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Section not found" });
   }
   const course = await Course.findByPk(section.course_id);
   if (
@@ -378,7 +426,9 @@ const createLesson = asyncHandler(async (req, res) => {
 const updateLesson = asyncHandler(async (req, res) => {
   const lesson = await Lesson.findByPk(req.params.lessonId);
   if (!lesson) {
-    return res.status(404).json({ success: false, message: "Lesson not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Lesson not found" });
   }
   const section = await Section.findByPk(lesson.section_id);
   const course = await Course.findByPk(section.course_id);
@@ -406,7 +456,9 @@ const updateLesson = asyncHandler(async (req, res) => {
 const deleteLesson = asyncHandler(async (req, res) => {
   const lesson = await Lesson.findByPk(req.params.lessonId);
   if (!lesson) {
-    return res.status(404).json({ success: false, message: "Lesson not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Lesson not found" });
   }
   const section = await Section.findByPk(lesson.section_id);
   const course = await Course.findByPk(section.course_id);
@@ -424,7 +476,9 @@ const deleteLesson = asyncHandler(async (req, res) => {
 const addLessonResource = asyncHandler(async (req, res) => {
   const lesson = await Lesson.findByPk(req.params.lessonId);
   if (!lesson) {
-    return res.status(404).json({ success: false, message: "Lesson not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Lesson not found" });
   }
   const section = await Section.findByPk(lesson.section_id);
   const course = await Course.findByPk(section.course_id);
@@ -449,7 +503,9 @@ const addLessonResource = asyncHandler(async (req, res) => {
 const deleteLessonResource = asyncHandler(async (req, res) => {
   const resource = await LessonResource.findByPk(req.params.resourceId);
   if (!resource) {
-    return res.status(404).json({ success: false, message: "Resource not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Resource not found" });
   }
   const lesson = await Lesson.findByPk(resource.lesson_id);
   const section = await Section.findByPk(lesson.section_id);
@@ -486,7 +542,9 @@ const createCategory = asyncHandler(async (req, res) => {
 const updateCategory = asyncHandler(async (req, res) => {
   const category = await Category.findByPk(req.params.id);
   if (!category) {
-    return res.status(404).json({ success: false, message: "Category not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Category not found" });
   }
   await category.update({
     name: req.body.name ?? category.name,
@@ -501,7 +559,9 @@ const updateCategory = asyncHandler(async (req, res) => {
 const deleteCategory = asyncHandler(async (req, res) => {
   const category = await Category.findByPk(req.params.id);
   if (!category) {
-    return res.status(404).json({ success: false, message: "Category not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Category not found" });
   }
   await category.destroy();
   res.json({ success: true, message: "Category removed" });

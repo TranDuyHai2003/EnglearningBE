@@ -39,3 +39,5 @@ coverage/
 *.pid
 *.seed
 .node_modules
+
+*.txt
