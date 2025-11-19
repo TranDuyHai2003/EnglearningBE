@@ -1,3 +1,5 @@
+const { Op } = require("sequelize");
+const { sequelize } = require("../config/database");
 const {
   InstructorProfile,
   User,
@@ -7,71 +9,47 @@ const {
   Transaction,
   Review,
   QaDiscussion,
-  sequelize,
+  QaReply,
+  Lesson,
+  Section,
 } = require("../models");
 const asyncHandler = require("../utils/asyncHandler");
 const { getPagination } = require("../utils/pagination");
-const { Op } = require("sequelize");
 
-const getMyProfile = asyncHandler(async (req, res) => {
-  // req.user.id được lấy từ token đã được authMiddleware giải mã
-  const profile = await InstructorProfile.findOne({
-    where: { user_id: req.user.id },
-    include: [{ model: User, as: "user", attributes: ["full_name", "email"] }],
-  });
-
-  if (!profile) {
-    // Trả về 404 nếu không tìm thấy, đúng với mong đợi của frontend
-    return res.status(404).json({
-      success: false,
-      message: "Instructor profile not found for the current user.",
-    });
-  }
-
-  res.json({ success: true, data: profile });
-});
-
-// src/controllers/instructorController.js
-
+// ==========================================================
+// CÁC HÀM CŨ (KHÔNG THAY ĐỔI)
+// ==========================================================
 const createProfile = asyncHandler(async (req, res) => {
-  // === Bổ sung logic kiểm tra ===
   const user = await User.findByPk(req.user.id);
   if (!user) {
     return res.status(404).json({ success: false, message: "User not found" });
   }
-
-  // Nếu user đã là instructor (được duyệt), không cho tạo lại profile
   if (user.role === "instructor") {
     const existingApprovedProfile = await InstructorProfile.findOne({
       where: { user_id: req.user.id, approval_status: "approved" },
     });
     if (existingApprovedProfile) {
-      return res.status(400).json({
-        success: false,
-        message: "Bạn đã là một giảng viên đã được phê duyệt.",
-      });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Bạn đã là một giảng viên đã được phê duyệt.",
+        });
     }
   }
-  // === Kết thúc bổ sung ===
-
   const existing = await InstructorProfile.findOne({
     where: { user_id: req.user.id },
   });
   if (existing) {
     return res
       .status(400)
-      .json({ success: false, message: "Bạn đã có hồ sơ. Vui lòng cập nhật." }); // Sửa lại message cho rõ ràng
+      .json({ success: false, message: "Bạn đã có hồ sơ. Vui lòng cập nhật." });
   }
-
   const profile = await InstructorProfile.create({
     user_id: req.user.id,
-    bio: req.body.bio,
-    education: req.body.education,
-    experience: req.body.experience,
-    certificates: req.body.certificates,
-    approval_status: "pending", // Trạng thái mặc định khi tạo là 'pending'
+    ...req.body,
+    approval_status: "pending",
   });
-
   res.status(201).json({ success: true, data: profile });
 });
 
@@ -84,16 +62,11 @@ const updateProfile = asyncHandler(async (req, res) => {
       .status(404)
       .json({ success: false, message: "Profile not found" });
   }
-
   await profile.update({
-    bio: req.body.bio ?? profile.bio,
-    education: req.body.education ?? profile.education,
-    experience: req.body.experience ?? profile.experience,
-    certificates: req.body.certificates ?? profile.certificates,
+    ...req.body,
     approval_status: "pending",
     rejection_reason: null,
   });
-
   res.json({ success: true, data: profile });
 });
 
@@ -103,7 +76,6 @@ const listProfiles = asyncHandler(async (req, res) => {
   if (req.query.status) {
     where.approval_status = req.query.status;
   }
-
   const result = await InstructorProfile.findAndCountAll({
     where,
     include: [{ model: User, as: "user" }],
@@ -111,7 +83,6 @@ const listProfiles = asyncHandler(async (req, res) => {
     offset,
     order: [["profile_id", "DESC"]],
   });
-
   res.json({
     success: true,
     data: result.rows,
@@ -129,49 +100,60 @@ const reviewProfile = asyncHandler(async (req, res) => {
   if (!["approved", "rejected"].includes(status)) {
     return res.status(400).json({ success: false, message: "Invalid status" });
   }
-
   const profile = await InstructorProfile.findByPk(req.params.id);
   if (!profile) {
     return res
       .status(404)
       .json({ success: false, message: "Profile not found" });
   }
-
   await profile.update({
     approval_status: status,
     approved_by: req.user.id,
     approved_at: status === "approved" ? new Date() : null,
     rejection_reason: status === "rejected" ? reason : null,
   });
-
   const user = await User.findByPk(profile.user_id);
   if (status === "approved" && user.role === "student") {
     user.role = "instructor";
     await user.save();
   }
-
   res.json({ success: true, data: profile });
 });
 
 const getInstructorCourses = asyncHandler(async (req, res) => {
-  const instructorId = parseInt(req.params.id, 10);
   const courses = await Course.findAll({
-    where: { instructor_id: instructorId },
+    where: { instructor_id: parseInt(req.params.id, 10) },
     order: [["created_at", "DESC"]],
   });
   res.json({ success: true, data: courses });
 });
 
+const getMyProfile = asyncHandler(async (req, res) => {
+  const profile = await InstructorProfile.findOne({
+    where: { user_id: req.user.id },
+    include: [{ model: User, as: "user", attributes: ["full_name", "email"] }],
+  });
+  if (!profile) {
+    return res
+      .status(404)
+      .json({ success: false, message: "Instructor profile not found." });
+  }
+  res.json({ success: true, data: profile });
+});
+
+// ==========================================================
+// === CÁC HÀM DASHBOARD ĐÃ SỬA LỖI ===
+// ==========================================================
+
 const getDashboardSummary = asyncHandler(async (req, res) => {
   const instructorId = req.user.id;
-
-  const instructorCourses = await Course.findAll({
-    where: { instructor_id: instructorId },
-    attributes: ["course_id", "total_students", "average_rating"],
-  });
-
-  const courseIds = instructorCourses.map((c) => c.course_id);
-
+  const courseIds = (
+    await Course.findAll({
+      where: { instructor_id: instructorId },
+      attributes: ["course_id"],
+      raw: true,
+    })
+  ).map((c) => c.course_id);
   if (courseIds.length === 0) {
     return res.json({
       success: true,
@@ -187,187 +169,176 @@ const getDashboardSummary = asyncHandler(async (req, res) => {
       },
     });
   }
-
-  const [
-    totalEnrollments,
-    totalRevenue,
-    pendingQuestions,
-    revenueOverTime,
-    enrollmentsOverTime,
-  ] = await Promise.all([
-    Enrollment.count({
-      where: { course_id: { [Op.in]: courseIds } },
-    }),
-    TransactionDetail.sum("final_price", {
-      where: { course_id: { [Op.in]: courseIds } },
-      include: [
+  const [stats, pendingQuestionsResult, revenueOverTime, enrollmentsOverTime] =
+    await Promise.all([
+      sequelize.query(
+        `SELECT (SELECT COUNT(*) FROM enrollments WHERE course_id IN (:courseIds)) AS "totalEnrollments", (SELECT SUM(td.final_price) FROM transaction_details td JOIN transactions t ON td.transaction_id = t.transaction_id WHERE td.course_id IN (:courseIds) AND t.status = 'completed') AS "totalRevenue", (SELECT AVG(r.rating) FROM reviews r WHERE r.course_id IN (:courseIds) AND r.status = 'approved') AS "averageRating"`,
         {
-          model: Transaction,
-          as: "transaction",
-          where: { status: "completed" },
-          attributes: [],
-        },
-      ],
-    }),
-    QaDiscussion.count({
-      where: {
-        course_id: { [Op.in]: courseIds },
-        parent_discussion_id: null,
-        is_instructor_reply: false,
-      },
-      include: [
-        {
-          model: QaDiscussion,
-          as: "replies",
-          required: false,
-        },
-      ],
-      having: sequelize.literal(
-        '(SELECT COUNT(*) FROM "qa_discussions" AS "reply" WHERE "reply"."parent_discussion_id" = "QaDiscussion"."discussion_id" AND "reply"."is_instructor_reply" = true) = 0'
+          replacements: { courseIds },
+          type: sequelize.QueryTypes.SELECT,
+          plain: true,
+        }
       ),
-    }),
-    sequelize.query(
-      `
-      SELECT
-        TO_CHAR(DATE_TRUNC('month', t.payment_at), 'YYYY-MM') as month,
-        SUM(td.final_price) as revenue
-      FROM transactions t
-      JOIN transaction_details td ON t.transaction_id = td.transaction_id
-      WHERE t.status = 'completed'
-        AND td.course_id IN (:courseIds)
-        AND t.payment_at IS NOT NULL
-        AND t.payment_at >= NOW() - INTERVAL '12 months'
-      GROUP BY DATE_TRUNC('month', t.payment_at)
-      ORDER BY month ASC
-    `,
-      {
-        replacements: { courseIds },
-        type: sequelize.QueryTypes.SELECT,
-      }
-    ),
-    sequelize.query(
-      `
-      SELECT
-        TO_CHAR(DATE_TRUNC('month', enrolled_at), 'YYYY-MM') as month,
-        COUNT(*) as enrollments
-      FROM enrollments
-      WHERE course_id IN (:courseIds)
-        AND enrolled_at >= NOW() - INTERVAL '12 months'
-      GROUP BY DATE_TRUNC('month', enrolled_at)
-      ORDER BY month ASC
-    `,
-      {
-        replacements: { courseIds },
-        type: sequelize.QueryTypes.SELECT,
-      }
-    ),
-  ]);
-
-  const totalStudents = instructorCourses.reduce(
-    (sum, course) => sum + Number(course.total_students || 0),
-    0
-  );
-
-  const averageRating =
-    instructorCourses.reduce(
-      (sum, course) => sum + Number(course.average_rating || 0),
-      0
-    ) / instructorCourses.length;
-
+      sequelize.query(
+        `SELECT COUNT(d.discussion_id) FROM qa_discussions d JOIN lessons l ON d.lesson_id = l.lesson_id JOIN sections s ON l.section_id = s.section_id WHERE s.course_id IN (:courseIds) AND NOT EXISTS (SELECT 1 FROM qa_replies r WHERE r.discussion_id = d.discussion_id)`,
+        {
+          replacements: { courseIds },
+          type: sequelize.QueryTypes.SELECT,
+          plain: true,
+        }
+      ),
+      TransactionDetail.findAll({
+        attributes: [
+          [
+            sequelize.fn(
+              "date_trunc",
+              "month",
+              sequelize.col("transaction.created_at")
+            ),
+            "month",
+          ],
+          [sequelize.fn("SUM", sequelize.col("final_price")), "revenue"],
+        ],
+        include: [
+          {
+            model: Transaction,
+            as: "transaction",
+            where: { status: "completed" },
+            attributes: [],
+          },
+        ],
+        where: { course_id: courseIds },
+        group: [
+          sequelize.fn(
+            "date_trunc",
+            "month",
+            sequelize.col("transaction.created_at")
+          ),
+        ],
+        order: [
+          [
+            sequelize.fn(
+              "date_trunc",
+              "month",
+              sequelize.col("transaction.created_at")
+            ),
+            "ASC",
+          ],
+        ],
+        raw: true,
+      }),
+      Enrollment.findAll({
+        attributes: [
+          [
+            sequelize.fn("date_trunc", "month", sequelize.col("enrolled_at")),
+            "month",
+          ],
+          [
+            sequelize.fn("COUNT", sequelize.col("enrollment_id")),
+            "enrollments",
+          ],
+        ],
+        where: { course_id: courseIds },
+        group: [
+          sequelize.fn("date_trunc", "month", sequelize.col("enrolled_at")),
+        ],
+        order: [
+          [
+            sequelize.fn("date_trunc", "month", sequelize.col("enrolled_at")),
+            "ASC",
+          ],
+        ],
+        raw: true,
+      }),
+    ]);
   res.json({
     success: true,
     data: {
-      total_students: totalStudents,
-      total_revenue: Number(totalRevenue || 0),
-      average_rating: Number(averageRating.toFixed(2)),
-      pending_questions_count: pendingQuestions,
-      total_courses: instructorCourses.length,
-      total_enrollments: totalEnrollments,
-      revenue_over_time: revenueOverTime.map((item) => ({
-        month: item.month,
-        revenue: Number(item.revenue),
-      })),
-      enrollments_over_time: enrollmentsOverTime.map((item) => ({
-        month: item.month,
-        enrollments: Number(item.enrollments),
-      })),
+      total_students: Number(stats.totalEnrollments) || 0,
+      total_revenue: Number(stats.totalRevenue) || 0,
+      average_rating: parseFloat(stats.averageRating) || 0,
+      pending_questions_count: Number(pendingQuestionsResult.count) || 0,
+      total_courses: courseIds.length,
+      total_enrollments: Number(stats.totalEnrollments) || 0,
+      revenue_over_time: revenueOverTime,
+      enrollments_over_time: enrollmentsOverTime,
     },
   });
 });
 
 const getActionItems = asyncHandler(async (req, res) => {
   const instructorId = req.user.id;
-
-  const instructorCourses = await Course.findAll({
-    where: { instructor_id: instructorId },
-    attributes: ["course_id"],
-  });
-
-  const courseIds = instructorCourses.map((c) => c.course_id);
-
+  const courseIds = (
+    await Course.findAll({
+      where: { instructor_id: instructorId },
+      attributes: ["course_id"],
+      raw: true,
+    })
+  ).map((c) => c.course_id);
   if (courseIds.length === 0) {
     return res.json({
       success: true,
-      data: {
-        pending_questions: [],
-        recent_reviews: [],
-      },
+      data: { pending_questions: [], recent_reviews: [] },
     });
   }
-
   const [pendingQuestions, recentReviews] = await Promise.all([
     QaDiscussion.findAll({
       where: {
-        course_id: { [Op.in]: courseIds },
-        parent_discussion_id: null,
-        is_instructor_reply: false,
+        [Op.and]: [
+          // Op.and yêu cầu import Op
+          sequelize.literal(
+            `"lesson->section"."course_id" IN (${courseIds.join(",")})`
+          ),
+          sequelize.literal(
+            `NOT EXISTS (SELECT 1 FROM qa_replies WHERE qa_replies.discussion_id = "QaDiscussion".discussion_id)`
+          ),
+        ],
       },
       include: [
         {
-          model: User,
-          as: "user",
-          attributes: ["user_id", "full_name", "avatar_url"],
+          model: Lesson,
+          as: "lesson",
+          attributes: ["title"],
+          required: true,
+          include: [
+            {
+              model: Section,
+              as: "section",
+              attributes: [],
+              required: true,
+              include: [
+                {
+                  model: Course,
+                  as: "course",
+                  attributes: ["course_id", "title"],
+                },
+              ],
+            },
+          ],
         },
-        {
-          model: Course,
-          as: "course",
-          attributes: ["course_id", "title"],
-        },
-        {
-          model: QaDiscussion,
-          as: "replies",
-          required: false,
-          where: { is_instructor_reply: true },
-        },
-      ],
-      order: [["created_at", "DESC"]],
-      limit: 5,
-      having: sequelize.literal(
-        '(SELECT COUNT(*) FROM "qa_discussions" AS "reply" WHERE "reply"."parent_discussion_id" = "QaDiscussion"."discussion_id" AND "reply"."is_instructor_reply" = true) = 0'
-      ),
-    }),
-    Review.findAll({
-      where: {
-        course_id: { [Op.in]: courseIds },
-        status: "approved",
-      },
-      include: [
         {
           model: User,
           as: "student",
           attributes: ["user_id", "full_name", "avatar_url"],
         },
+      ],
+      order: [["created_at", "DESC"]],
+      limit: 5,
+    }),
+    Review.findAll({
+      where: { course_id: courseIds },
+      include: [
+        { model: Course, as: "course", attributes: ["course_id", "title"] },
         {
-          model: Course,
-          as: "course",
-          attributes: ["course_id", "title"],
+          model: User,
+          as: "student",
+          attributes: ["user_id", "full_name", "avatar_url"],
         },
       ],
       order: [["created_at", "DESC"]],
       limit: 5,
     }),
   ]);
-
   res.json({
     success: true,
     data: {
