@@ -12,6 +12,8 @@ const {
 const asyncHandler = require("../utils/asyncHandler");
 const { getPagination } = require("../utils/pagination");
 const { Op } = require("sequelize");
+const path = require("path");
+const fs = require("fs");
 
 const getMyProfile = asyncHandler(async (req, res) => {
   // req.user.id được lấy từ token đã được authMiddleware giải mã
@@ -377,6 +379,153 @@ const getActionItems = asyncHandler(async (req, res) => {
   });
 });
 
+const uploadInstructorCV = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({
+      success: false,
+      message: "No file uploaded"
+    });
+  }
+
+  const profile = await InstructorProfile.findOne({
+    where: { user_id: req.user.id }
+  });
+
+  if (!profile) {
+    fs.unlinkSync(req.file.path);
+    return res.status(404).json({
+      success: false,
+      message: "Instructor profile not found. Please create a profile first."
+    });
+  }
+
+  // Delete old CV if exists
+  if (profile.cv_url) {
+    const oldCVPath = path.join(__dirname, '../../', profile.cv_url);
+    if (fs.existsSync(oldCVPath)) {
+      fs.unlinkSync(oldCVPath);
+    }
+  }
+
+  // Update profile with new CV information
+  const cvUrl = `/uploads/cvs/${req.file.filename}`;
+  await profile.update({
+    cv_url: cvUrl,
+    cv_file_name: req.file.originalname,
+    cv_uploaded_at: new Date()
+  });
+
+  res.json({
+    success: true,
+    message: "CV uploaded successfully",
+    data: {
+      cv_url: cvUrl,
+      cv_file_name: req.file.originalname,
+      cv_uploaded_at: profile.cv_uploaded_at,
+      file_size: req.file.size
+    }
+  });
+});
+
+const uploadInstructorCertificates = asyncHandler(async (req, res) => {
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: "No files uploaded"
+    });
+  }
+
+  const profile = await InstructorProfile.findOne({
+    where: { user_id: req.user.id }
+  });
+
+  if (!profile) {
+    // Delete uploaded files if profile not found
+    req.files.forEach(file => fs.unlinkSync(file.path));
+    return res.status(404).json({
+      success: false,
+      message: "Instructor profile not found. Please create a profile first."
+    });
+  }
+
+  // Process uploaded certificate files
+  const certificateFiles = req.files.map(file => ({
+    url: `/uploads/certificates/${file.filename}`,
+    file_name: file.originalname,
+    file_size: file.size,
+    uploaded_at: new Date()
+  }));
+
+  // Get existing certificates and append new ones
+  const existingCertificates = profile.certificate_files || [];
+  const updatedCertificates = [...existingCertificates, ...certificateFiles];
+
+  await profile.update({
+    certificate_files: updatedCertificates
+  });
+
+  res.json({
+    success: true,
+    message: `${req.files.length} certificate(s) uploaded successfully`,
+    data: {
+      uploaded_certificates: certificateFiles,
+      total_certificates: updatedCertificates.length
+    }
+  });
+});
+
+const deleteInstructorCertificate = asyncHandler(async (req, res) => {
+  const { certificateUrl } = req.body;
+
+  if (!certificateUrl) {
+    return res.status(400).json({
+      success: false,
+      message: "Certificate URL is required"
+    });
+  }
+
+  const profile = await InstructorProfile.findOne({
+    where: { user_id: req.user.id }
+  });
+
+  if (!profile) {
+    return res.status(404).json({
+      success: false,
+      message: "Instructor profile not found"
+    });
+  }
+
+  const existingCertificates = profile.certificate_files || [];
+  const updatedCertificates = existingCertificates.filter(
+    cert => cert.url !== certificateUrl
+  );
+
+  if (existingCertificates.length === updatedCertificates.length) {
+    return res.status(404).json({
+      success: false,
+      message: "Certificate not found"
+    });
+  }
+
+  // Delete the file from filesystem
+  const filePath = path.join(__dirname, '../../', certificateUrl);
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+  }
+
+  await profile.update({
+    certificate_files: updatedCertificates
+  });
+
+  res.json({
+    success: true,
+    message: "Certificate deleted successfully",
+    data: {
+      remaining_certificates: updatedCertificates.length
+    }
+  });
+});
+
 module.exports = {
   createProfile,
   updateProfile,
@@ -386,4 +535,7 @@ module.exports = {
   getMyProfile,
   getDashboardSummary,
   getActionItems,
+  uploadInstructorCV,
+  uploadInstructorCertificates,
+  deleteInstructorCertificate,
 };

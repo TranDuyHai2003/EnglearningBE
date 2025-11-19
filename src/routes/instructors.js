@@ -8,9 +8,13 @@ const {
   getMyProfile,
   getDashboardSummary,
   getActionItems,
+  uploadInstructorCV,
+  uploadInstructorCertificates,
+  deleteInstructorCertificate,
 } = require("../controllers/instructorController");
 const { authMiddleware } = require("../middleware/auth");
 const { allowRoles, minRole } = require("../middleware/roles");
+const { uploadCV, uploadCertificate } = require("../middleware/upload");
 
 const router = express.Router();
 
@@ -36,6 +40,25 @@ router.get(
   "/dashboard/action-items",
   allowRoles("instructor", "system_admin"),
   getActionItems
+);
+
+// File upload routes for instructors
+router.post(
+  "/upload-cv",
+  allowRoles("instructor", "student"),
+  uploadCV,
+  uploadInstructorCV
+);
+router.post(
+  "/upload-certificates",
+  allowRoles("instructor", "student"),
+  uploadCertificate,
+  uploadInstructorCertificates
+);
+router.delete(
+  "/delete-certificate",
+  allowRoles("instructor", "student"),
+  deleteInstructorCertificate
 );
 
 module.exports = router;
