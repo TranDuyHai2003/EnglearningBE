@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const path = require("path");
 
 const env = require("./config/env");
 const { initDatabase } = require("./config/database");
@@ -23,6 +24,9 @@ app.use(helmet());
 app.use(cors({ origin: env.FRONTEND_URL }));
 app.use(morgan("dev"));
 app.use(express.json());
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);

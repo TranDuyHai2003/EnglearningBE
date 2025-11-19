@@ -25,6 +25,19 @@ const InstructorProfile = sequelize.define(
     certificates: {
       type: DataTypes.TEXT,
     },
+    certificate_files: {
+      type: DataTypes.JSON,
+      defaultValue: [],
+    },
+    cv_url: {
+      type: DataTypes.STRING,
+    },
+    cv_file_name: {
+      type: DataTypes.STRING,
+    },
+    cv_uploaded_at: {
+      type: DataTypes.DATE,
+    },
     approval_status: {
       type: DataTypes.ENUM("pending", "approved", "rejected"),
       defaultValue: "pending",

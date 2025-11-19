@@ -30,6 +30,15 @@ const User = sequelize.define(
     avatar_url: {
       type: DataTypes.STRING,
     },
+    cv_url: {
+      type: DataTypes.STRING,
+    },
+    cv_file_name: {
+      type: DataTypes.STRING,
+    },
+    cv_uploaded_at: {
+      type: DataTypes.DATE,
+    },
     role: {
       type: DataTypes.ENUM(
         "student",

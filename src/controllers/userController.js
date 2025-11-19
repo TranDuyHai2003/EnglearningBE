@@ -1,5 +1,7 @@
 const { Op } = require("sequelize");
 const bcryptjs = require("bcryptjs");
+const path = require("path");
+const fs = require("fs");
 const {
   User,
   InstructorProfile,
@@ -15,6 +17,9 @@ const serializeUser = (user) => ({
   full_name: user.full_name,
   phone: user.phone,
   avatar_url: user.avatar_url,
+  cv_url: user.cv_url,
+  cv_file_name: user.cv_file_name,
+  cv_uploaded_at: user.cv_uploaded_at,
   role: user.role,
   status: user.status,
   last_login: user.last_login,
@@ -199,6 +204,106 @@ const getUserCourses = asyncHandler(async (req, res) => {
   });
 });
 
+const uploadAvatar = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({
+      success: false,
+      message: "No file uploaded"
+    });
+  }
+
+  const userId = req.params.id;
+  const user = await User.findByPk(userId);
+
+  if (!user) {
+    // Delete uploaded file if user not found
+    fs.unlinkSync(req.file.path);
+    return res.status(404).json({ success: false, message: "User not found" });
+  }
+
+  const canEdit = req.user.role === "support_admin" ||
+                  req.user.role === "system_admin" ||
+                  req.user.id === user.user_id;
+  if (!canEdit) {
+    fs.unlinkSync(req.file.path);
+    return res.status(403).json({ success: false, message: "Forbidden" });
+  }
+
+  // Delete old avatar if exists
+  if (user.avatar_url) {
+    const oldAvatarPath = path.join(__dirname, '../../', user.avatar_url);
+    if (fs.existsSync(oldAvatarPath)) {
+      fs.unlinkSync(oldAvatarPath);
+    }
+  }
+
+  // Update user with new avatar URL
+  const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+  await user.update({ avatar_url: avatarUrl });
+
+  res.json({
+    success: true,
+    message: "Avatar uploaded successfully",
+    data: {
+      avatar_url: avatarUrl,
+      file_name: req.file.originalname,
+      file_size: req.file.size
+    }
+  });
+});
+
+const uploadCV = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({
+      success: false,
+      message: "No file uploaded"
+    });
+  }
+
+  const userId = req.params.id;
+  const user = await User.findByPk(userId);
+
+  if (!user) {
+    fs.unlinkSync(req.file.path);
+    return res.status(404).json({ success: false, message: "User not found" });
+  }
+
+  const canEdit = req.user.role === "support_admin" ||
+                  req.user.role === "system_admin" ||
+                  req.user.id === user.user_id;
+  if (!canEdit) {
+    fs.unlinkSync(req.file.path);
+    return res.status(403).json({ success: false, message: "Forbidden" });
+  }
+
+  // Delete old CV if exists
+  if (user.cv_url) {
+    const oldCVPath = path.join(__dirname, '../../', user.cv_url);
+    if (fs.existsSync(oldCVPath)) {
+      fs.unlinkSync(oldCVPath);
+    }
+  }
+
+  // Update user with new CV information
+  const cvUrl = `/uploads/cvs/${req.file.filename}`;
+  await user.update({
+    cv_url: cvUrl,
+    cv_file_name: req.file.originalname,
+    cv_uploaded_at: new Date()
+  });
+
+  res.json({
+    success: true,
+    message: "CV uploaded successfully",
+    data: {
+      cv_url: cvUrl,
+      cv_file_name: req.file.originalname,
+      cv_uploaded_at: user.cv_uploaded_at,
+      file_size: req.file.size
+    }
+  });
+});
+
 module.exports = {
   listUsers,
   getUser,
@@ -206,4 +311,6 @@ module.exports = {
   updateUserRole,
   changePassword,
   getUserCourses,
+  uploadAvatar,
+  uploadCV,
 };
