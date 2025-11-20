@@ -11,6 +11,7 @@ const {
   uploadInstructorCV,
   uploadInstructorCertificates,
   deleteInstructorCertificate,
+  getProfileById,
 } = require("../controllers/instructorController");
 const { authMiddleware } = require("../middleware/auth");
 const { allowRoles, minRole } = require("../middleware/roles");
@@ -60,5 +61,7 @@ router.delete(
   allowRoles("instructor", "student"),
   deleteInstructorCertificate
 );
+
+router.get("/profiles/:id", minRole("support_admin"), getProfileById);
 
 module.exports = router;

@@ -1,4 +1,3 @@
-const { Op } = require("sequelize");
 const { sequelize } = require("../config/database");
 const {
   InstructorProfile,
@@ -144,19 +143,6 @@ const getInstructorCourses = asyncHandler(async (req, res) => {
     order: [["created_at", "DESC"]],
   });
   res.json({ success: true, data: courses });
-});
-
-const getMyProfile = asyncHandler(async (req, res) => {
-  const profile = await InstructorProfile.findOne({
-    where: { user_id: req.user.id },
-    include: [{ model: User, as: "user", attributes: ["full_name", "email"] }],
-  });
-  if (!profile) {
-    return res
-      .status(404)
-      .json({ success: false, message: "Instructor profile not found." });
-  }
-  res.json({ success: true, data: profile });
 });
 
 // ==========================================================
@@ -513,6 +499,26 @@ const deleteInstructorCertificate = asyncHandler(async (req, res) => {
   });
 });
 
+const getProfileById = asyncHandler(async (req, res) => {
+  const profile = await InstructorProfile.findByPk(req.params.id, {
+    include: [
+      {
+        model: User,
+        as: "user",
+        attributes: ["full_name", "email", "avatar_url"],
+      },
+    ],
+  });
+
+  if (!profile) {
+    return res
+      .status(404)
+      .json({ success: false, message: "Profile not found" });
+  }
+
+  res.json({ success: true, data: profile });
+});
+
 module.exports = {
   createProfile,
   updateProfile,
@@ -525,4 +531,5 @@ module.exports = {
   uploadInstructorCV,
   uploadInstructorCertificates,
   deleteInstructorCertificate,
+  getProfileById,
 };
