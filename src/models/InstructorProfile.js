@@ -38,10 +38,36 @@ const InstructorProfile = sequelize.define(
     cv_uploaded_at: {
       type: DataTypes.DATE,
     },
+    cv_url: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: "Link dẫn đến CV (PDF/Drive)",
+    },
+    intro_video_url: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: "Link video giới thiệu hoặc dạy thử (YouTube/Drive)",
+    },
+    interview_date: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: "Ngày hẹn phỏng vấn",
+    },
+    interview_notes: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      comment: "Ghi chú của Admin về buổi phỏng vấn (Only Admin see)",
+    },
+    meeting_link: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: "Link Google Meet/Zoom hoặc Địa chỉ phòng họp",
+    },
     approval_status: {
-      type: DataTypes.ENUM("pending", "approved", "rejected"),
+      type: DataTypes.ENUM("pending", "interviewing", "approved", "rejected"),
       defaultValue: "pending",
     },
+
     approved_by: {
       type: DataTypes.INTEGER,
     },

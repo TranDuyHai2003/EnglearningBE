@@ -1,3 +1,4 @@
+// src/controllers/instructorController.js
 const { sequelize } = require("../config/database");
 const {
   InstructorProfile,
@@ -19,54 +20,54 @@ const path = require("path");
 const fs = require("fs");
 
 const getMyProfile = asyncHandler(async (req, res) => {
-  // req.user.id được lấy từ token đã được authMiddleware giải mã
   const profile = await InstructorProfile.findOne({
     where: { user_id: req.user.id },
-    include: [{ model: User, as: "user", attributes: ["full_name", "email"] }],
+    include: [
+      {
+        model: User,
+        as: "user",
+        attributes: ["full_name", "email", "avatar_url", "phone"],
+      },
+    ],
   });
 
+  // Trả về null data thay vì 404 để FE dễ xử lý logic (người dùng chưa tạo hồ sơ)
   if (!profile) {
-    // Trả về 404 nếu không tìm thấy, đúng với mong đợi của frontend
-    return res.status(404).json({
-      success: false,
-      message: "Instructor profile not found for the current user.",
-    });
+    return res.json({ success: true, data: null });
   }
 
   res.json({ success: true, data: profile });
 });
-
-// src/controllers/instructorController.js
 
 const createProfile = asyncHandler(async (req, res) => {
   const user = await User.findByPk(req.user.id);
   if (!user) {
     return res.status(404).json({ success: false, message: "User not found" });
   }
-  if (user.role === "instructor") {
-    const existingApprovedProfile = await InstructorProfile.findOne({
-      where: { user_id: req.user.id, approval_status: "approved" },
-    });
-    if (existingApprovedProfile) {
-      return res.status(400).json({
-        success: false,
-        message: "Bạn đã là một giảng viên đã được phê duyệt.",
-      });
-    }
-  }
+
+  // Kiểm tra nếu đã có hồ sơ
   const existing = await InstructorProfile.findOne({
     where: { user_id: req.user.id },
   });
+
   if (existing) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Bạn đã có hồ sơ. Vui lòng cập nhật." });
+    return res.status(400).json({
+      success: false,
+      message: "Bạn đã có hồ sơ. Vui lòng sử dụng chức năng cập nhật.",
+    });
   }
+
   const profile = await InstructorProfile.create({
     user_id: req.user.id,
-    ...req.body,
+    bio: req.body.bio,
+    education: req.body.education,
+    experience: req.body.experience,
+    certificates: req.body.certificates,
+    cv_url: req.body.cv_url, // Link nhanh hoặc đường dẫn file upload sau
+    intro_video_url: req.body.intro_video_url,
     approval_status: "pending",
   });
+
   res.status(201).json({ success: true, data: profile });
 });
 
@@ -79,20 +80,39 @@ const updateProfile = asyncHandler(async (req, res) => {
       .status(404)
       .json({ success: false, message: "Profile not found" });
   }
+
+  // Logic bảo mật: Nếu đã Approved thì KHÔNG cho phép user tự ý sửa CV/Video qua API updateProfile này
+  const isApproved = profile.approval_status === "approved";
+
   await profile.update({
-    ...req.body,
-    approval_status: "pending",
-    rejection_reason: null,
+    bio: req.body.bio ?? profile.bio,
+    education: req.body.education ?? profile.education,
+    experience: req.body.experience ?? profile.experience,
+    certificates: req.body.certificates ?? profile.certificates,
+
+    // CV & Video: Nếu đã duyệt -> Giữ nguyên. Nếu chưa -> Cho phép sửa.
+    cv_url: isApproved ? profile.cv_url : req.body.cv_url ?? profile.cv_url,
+    intro_video_url: isApproved
+      ? profile.intro_video_url
+      : req.body.intro_video_url ?? profile.intro_video_url,
+
+    // Status: Nếu đã duyệt -> Giữ nguyên. Nếu chưa (vd rejected) -> Reset về Pending để duyệt lại.
+    approval_status: isApproved ? "approved" : "pending",
+    rejection_reason: isApproved ? profile.rejection_reason : null,
   });
+
   res.json({ success: true, data: profile });
 });
 
 const listProfiles = asyncHandler(async (req, res) => {
   const { limit, offset, page } = getPagination(req.query);
   const where = {};
+
+  // Hỗ trợ filter theo status (pending, interviewing, approved...)
   if (req.query.status) {
     where.approval_status = req.query.status;
   }
+
   const result = await InstructorProfile.findAndCountAll({
     where,
     include: [{ model: User, as: "user" }],
@@ -100,6 +120,7 @@ const listProfiles = asyncHandler(async (req, res) => {
     offset,
     order: [["profile_id", "DESC"]],
   });
+
   res.json({
     success: true,
     data: result.rows,
@@ -112,28 +133,42 @@ const listProfiles = asyncHandler(async (req, res) => {
   });
 });
 
+// === HÀM REVIEW ĐÃ CẬP NHẬT ===
 const reviewProfile = asyncHandler(async (req, res) => {
-  const { status, reason } = req.body;
-  if (!["approved", "rejected"].includes(status)) {
+  const { status, reason, interview_notes, interview_date } = req.body;
+
+  // 1. Validate status
+  if (!["approved", "rejected", "interviewing", "pending"].includes(status)) {
     return res.status(400).json({ success: false, message: "Invalid status" });
   }
+
   const profile = await InstructorProfile.findByPk(req.params.id);
   if (!profile) {
     return res
       .status(404)
       .json({ success: false, message: "Profile not found" });
   }
+
+  // 2. Cập nhật thông tin Profile
   await profile.update({
     approval_status: status,
-    approved_by: req.user.id,
+    approved_by: status === "approved" ? req.user.id : null,
     approved_at: status === "approved" ? new Date() : null,
     rejection_reason: status === "rejected" ? reason : null,
+    interview_notes: interview_notes ?? profile.interview_notes,
+    interview_date: interview_date ?? profile.interview_date,
   });
-  const user = await User.findByPk(profile.user_id);
-  if (status === "approved" && user.role === "student") {
-    user.role = "instructor";
-    await user.save();
+
+  // 3. Đảm bảo Role User là Instructor (nếu chưa phải)
+  // Chúng ta KHÔNG hạ role về student nữa, giữ role instructor để họ truy cập được /instructor/profile
+  if (status === "approved") {
+    const user = await User.findByPk(profile.user_id);
+    if (user && user.role === "student") {
+      user.role = "instructor";
+      await user.save();
+    }
   }
+
   res.json({ success: true, data: profile });
 });
 
@@ -145,12 +180,11 @@ const getInstructorCourses = asyncHandler(async (req, res) => {
   res.json({ success: true, data: courses });
 });
 
-// ==========================================================
-// === CÁC HÀM DASHBOARD ĐÃ SỬA LỖI ===
-// ==========================================================
-
+// --- DASHBOARD APIS ---
 const getDashboardSummary = asyncHandler(async (req, res) => {
   const instructorId = req.user.id;
+
+  // Lấy danh sách khóa học của giảng viên
   const courseIds = (
     await Course.findAll({
       where: { instructor_id: instructorId },
@@ -158,6 +192,7 @@ const getDashboardSummary = asyncHandler(async (req, res) => {
       raw: true,
     })
   ).map((c) => c.course_id);
+
   if (courseIds.length === 0) {
     return res.json({
       success: true,
@@ -173,24 +208,36 @@ const getDashboardSummary = asyncHandler(async (req, res) => {
       },
     });
   }
+
+  // Query thống kê song song
   const [stats, pendingQuestionsResult, revenueOverTime, enrollmentsOverTime] =
     await Promise.all([
+      // Tổng Enroll, Revenue, Rating
       sequelize.query(
-        `SELECT (SELECT COUNT(*) FROM enrollments WHERE course_id IN (:courseIds)) AS "totalEnrollments", (SELECT SUM(td.final_price) FROM transaction_details td JOIN transactions t ON td.transaction_id = t.transaction_id WHERE td.course_id IN (:courseIds) AND t.status = 'completed') AS "totalRevenue", (SELECT AVG(r.rating) FROM reviews r WHERE r.course_id IN (:courseIds) AND r.status = 'approved') AS "averageRating"`,
+        `SELECT 
+            (SELECT COUNT(*) FROM enrollments WHERE course_id IN (:courseIds)) AS "totalEnrollments", 
+            (SELECT SUM(td.final_price) FROM transaction_details td JOIN transactions t ON td.transaction_id = t.transaction_id WHERE td.course_id IN (:courseIds) AND t.status = 'completed') AS "totalRevenue", 
+            (SELECT AVG(r.rating) FROM reviews r WHERE r.course_id IN (:courseIds) AND r.status = 'approved') AS "averageRating"`,
         {
           replacements: { courseIds },
           type: sequelize.QueryTypes.SELECT,
           plain: true,
         }
       ),
+      // Đếm câu hỏi chưa trả lời
       sequelize.query(
-        `SELECT COUNT(d.discussion_id) FROM qa_discussions d JOIN lessons l ON d.lesson_id = l.lesson_id JOIN sections s ON l.section_id = s.section_id WHERE s.course_id IN (:courseIds) AND NOT EXISTS (SELECT 1 FROM qa_replies r WHERE r.discussion_id = d.discussion_id)`,
+        `SELECT COUNT(d.discussion_id) as count FROM qa_discussions d 
+         JOIN lessons l ON d.lesson_id = l.lesson_id 
+         JOIN sections s ON l.section_id = s.section_id 
+         WHERE s.course_id IN (:courseIds) 
+         AND NOT EXISTS (SELECT 1 FROM qa_replies r WHERE r.discussion_id = d.discussion_id)`,
         {
           replacements: { courseIds },
           type: sequelize.QueryTypes.SELECT,
           plain: true,
         }
       ),
+      // Revenue Over Time
       TransactionDetail.findAll({
         attributes: [
           [
@@ -231,6 +278,7 @@ const getDashboardSummary = asyncHandler(async (req, res) => {
         ],
         raw: true,
       }),
+      // Enrollments Over Time
       Enrollment.findAll({
         attributes: [
           [
@@ -255,6 +303,7 @@ const getDashboardSummary = asyncHandler(async (req, res) => {
         raw: true,
       }),
     ]);
+
   res.json({
     success: true,
     data: {
@@ -279,17 +328,18 @@ const getActionItems = asyncHandler(async (req, res) => {
       raw: true,
     })
   ).map((c) => c.course_id);
+
   if (courseIds.length === 0) {
     return res.json({
       success: true,
       data: { pending_questions: [], recent_reviews: [] },
     });
   }
+
   const [pendingQuestions, recentReviews] = await Promise.all([
     QaDiscussion.findAll({
       where: {
         [Op.and]: [
-          // Op.and yêu cầu import Op
           sequelize.literal(
             `"lesson->section"."course_id" IN (${courseIds.join(",")})`
           ),
@@ -343,6 +393,7 @@ const getActionItems = asyncHandler(async (req, res) => {
       limit: 5,
     }),
   ]);
+
   res.json({
     success: true,
     data: {
@@ -352,12 +403,12 @@ const getActionItems = asyncHandler(async (req, res) => {
   });
 });
 
+// --- FILE UPLOAD HANDLERS ---
 const uploadInstructorCV = asyncHandler(async (req, res) => {
   if (!req.file) {
-    return res.status(400).json({
-      success: false,
-      message: "No file uploaded",
-    });
+    return res
+      .status(400)
+      .json({ success: false, message: "No file uploaded" });
   }
 
   const profile = await InstructorProfile.findOne({
@@ -365,23 +416,27 @@ const uploadInstructorCV = asyncHandler(async (req, res) => {
   });
 
   if (!profile) {
-    fs.unlinkSync(req.file.path);
+    fs.unlinkSync(req.file.path); // Xóa file rác
     return res.status(404).json({
       success: false,
       message: "Instructor profile not found. Please create a profile first.",
     });
   }
 
-  // Delete old CV if exists
+  // Xóa file cũ nếu tồn tại
   if (profile.cv_url) {
     const oldCVPath = path.join(__dirname, "../../", profile.cv_url);
     if (fs.existsSync(oldCVPath)) {
-      fs.unlinkSync(oldCVPath);
+      try {
+        fs.unlinkSync(oldCVPath);
+      } catch (err) {
+        console.error("Failed to delete old CV:", err);
+      }
     }
   }
 
-  // Update profile with new CV information
   const cvUrl = `/uploads/cvs/${req.file.filename}`;
+
   await profile.update({
     cv_url: cvUrl,
     cv_file_name: req.file.originalname,
@@ -402,10 +457,9 @@ const uploadInstructorCV = asyncHandler(async (req, res) => {
 
 const uploadInstructorCertificates = asyncHandler(async (req, res) => {
   if (!req.files || req.files.length === 0) {
-    return res.status(400).json({
-      success: false,
-      message: "No files uploaded",
-    });
+    return res
+      .status(400)
+      .json({ success: false, message: "No files uploaded" });
   }
 
   const profile = await InstructorProfile.findOne({
@@ -413,15 +467,12 @@ const uploadInstructorCertificates = asyncHandler(async (req, res) => {
   });
 
   if (!profile) {
-    // Delete uploaded files if profile not found
     req.files.forEach((file) => fs.unlinkSync(file.path));
-    return res.status(404).json({
-      success: false,
-      message: "Instructor profile not found. Please create a profile first.",
-    });
+    return res
+      .status(404)
+      .json({ success: false, message: "Profile not found" });
   }
 
-  // Process uploaded certificate files
   const certificateFiles = req.files.map((file) => ({
     url: `/uploads/certificates/${file.filename}`,
     file_name: file.originalname,
@@ -429,17 +480,14 @@ const uploadInstructorCertificates = asyncHandler(async (req, res) => {
     uploaded_at: new Date(),
   }));
 
-  // Get existing certificates and append new ones
   const existingCertificates = profile.certificate_files || [];
   const updatedCertificates = [...existingCertificates, ...certificateFiles];
 
-  await profile.update({
-    certificate_files: updatedCertificates,
-  });
+  await profile.update({ certificate_files: updatedCertificates });
 
   res.json({
     success: true,
-    message: `${req.files.length} certificate(s) uploaded successfully`,
+    message: "Uploaded successfully",
     data: {
       uploaded_certificates: certificateFiles,
       total_certificates: updatedCertificates.length,
@@ -449,12 +497,10 @@ const uploadInstructorCertificates = asyncHandler(async (req, res) => {
 
 const deleteInstructorCertificate = asyncHandler(async (req, res) => {
   const { certificateUrl } = req.body;
-
   if (!certificateUrl) {
-    return res.status(400).json({
-      success: false,
-      message: "Certificate URL is required",
-    });
+    return res
+      .status(400)
+      .json({ success: false, message: "Certificate URL required" });
   }
 
   const profile = await InstructorProfile.findOne({
@@ -462,10 +508,9 @@ const deleteInstructorCertificate = asyncHandler(async (req, res) => {
   });
 
   if (!profile) {
-    return res.status(404).json({
-      success: false,
-      message: "Instructor profile not found",
-    });
+    return res
+      .status(404)
+      .json({ success: false, message: "Profile not found" });
   }
 
   const existingCertificates = profile.certificate_files || [];
@@ -474,28 +519,23 @@ const deleteInstructorCertificate = asyncHandler(async (req, res) => {
   );
 
   if (existingCertificates.length === updatedCertificates.length) {
-    return res.status(404).json({
-      success: false,
-      message: "Certificate not found",
-    });
+    return res
+      .status(404)
+      .json({ success: false, message: "Certificate not found" });
   }
 
-  // Delete the file from filesystem
+  // Xóa file vật lý
   const filePath = path.join(__dirname, "../../", certificateUrl);
   if (fs.existsSync(filePath)) {
     fs.unlinkSync(filePath);
   }
 
-  await profile.update({
-    certificate_files: updatedCertificates,
-  });
+  await profile.update({ certificate_files: updatedCertificates });
 
   res.json({
     success: true,
-    message: "Certificate deleted successfully",
-    data: {
-      remaining_certificates: updatedCertificates.length,
-    },
+    message: "Deleted successfully",
+    data: { remaining_certificates: updatedCertificates.length },
   });
 });
 
@@ -505,7 +545,7 @@ const getProfileById = asyncHandler(async (req, res) => {
       {
         model: User,
         as: "user",
-        attributes: ["full_name", "email", "avatar_url"],
+        attributes: ["full_name", "email", "avatar_url", "phone"],
       },
     ],
   });

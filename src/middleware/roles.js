@@ -5,16 +5,18 @@ const roleHierarchy = {
   system_admin: 4,
 };
 
-const allowRoles = (...roles) => (req, res, next) => {
-  const currentRole = req.user?.role;
-  if (!currentRole || !roles.includes(currentRole)) {
-    return res.status(403).json({
-      success: false,
-      message: "Forbidden",
-    });
-  }
-  next();
-};
+const allowRoles =
+  (...roles) =>
+  (req, res, next) => {
+    const currentRole = req.user?.role;
+    if (!currentRole || !roles.includes(currentRole)) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden",
+      });
+    }
+    next();
+  };
 
 const minRole = (role) => (req, res, next) => {
   const currentRole = req.user?.role;
