@@ -106,7 +106,14 @@ const getEnrollment = asyncHandler(async (req, res) => {
               {
                 model: Lesson,
                 as: "lessons",
-                include: [{ model: LessonResource, as: "resources" }],
+                required: false, // Allow sections without approved lessons
+                where: {
+                  approval_status: "approved",
+                },
+                include: [
+                  { model: LessonResource, as: "resources" },
+                  { model: Quiz, as: "quiz", attributes: ["quiz_id", "title"] },
+                ],
               },
             ],
           },
@@ -274,10 +281,17 @@ const upsertQuiz = asyncHandler(async (req, res) => {
     show_correct_answers: req.body.show_correct_answers,
   };
 
-  const [quiz] = await Quiz.upsert(payload, {
-    returning: true,
-  });
+  // Check if quiz exists for this lesson
+  let existingQuiz = await Quiz.findOne({ where: { lesson_id: lesson.lesson_id } });
+  
+  if (existingQuiz) {
+    // Update existing
+    existingQuiz = await existingQuiz.update(payload);
+    return res.status(200).json({ success: true, data: existingQuiz });
+  }
 
+  // Create new
+  const quiz = await Quiz.create(payload);
   res.status(201).json({ success: true, data: quiz });
 });
 
@@ -503,7 +517,18 @@ const getMyCourseContent = asyncHandler(async (req, res) => {
   const courseId = parseInt(req.params.courseId, 10);
   const studentId = req.user.id;
 
-  const enrollment = await Enrollment.findOne({
+  // Check if user is admin or instructor of this course
+  const courseCheck = await Course.findByPk(courseId);
+  const isAdminOrInstructor =
+    req.user.role === "system_admin" ||
+    req.user.role === "support_admin" ||
+    req.user.role === "content_admin" || // Added content_admin
+    (req.user.role === "instructor" && courseCheck?.instructor_id === req.user.id);
+
+  // Define lesson inclusion filter based on role
+  const lessonWhere = isAdminOrInstructor ? {} : { approval_status: "approved" };
+
+  let enrollment = await Enrollment.findOne({
     where: {
       student_id: studentId,
       course_id: courseId,
@@ -520,7 +545,12 @@ const getMyCourseContent = asyncHandler(async (req, res) => {
               {
                 model: Lesson,
                 as: "lessons",
-                include: [{ model: LessonResource, as: "resources" }],
+                required: false,
+                where: lessonWhere,
+                include: [
+                  { model: LessonResource, as: "resources" },
+                  { model: Quiz, as: "quiz", attributes: ["quiz_id", "title"] },
+                ],
               },
             ],
           },
@@ -531,7 +561,6 @@ const getMyCourseContent = asyncHandler(async (req, res) => {
         as: "lessonProgress",
       },
     ],
-    // === SỬA LẠI ĐOẠN NÀY ===
     order: [
       [
         { model: Course, as: "course" },
@@ -547,8 +576,57 @@ const getMyCourseContent = asyncHandler(async (req, res) => {
         "ASC",
       ],
     ],
-    // === KẾT THÚC PHẦN SỬA ===
   });
+
+  // If no enrollment but authorized (admin/instructor), fetch course directly
+  if (!enrollment && isAdminOrInstructor) {
+    const course = await Course.findByPk(courseId, {
+      include: [
+        {
+          model: Section,
+          as: "sections",
+          include: [
+            {
+              model: Lesson,
+              as: "lessons",
+              required: false,
+              where: lessonWhere,
+              include: [
+                { model: LessonResource, as: "resources" },
+                { model: Quiz, as: "quiz", attributes: ["quiz_id", "title"] },
+              ],
+            },
+          ],
+        },
+      ],
+      order: [
+        [{ model: Section, as: "sections" }, "display_order", "ASC"],
+        [
+          { model: Section, as: "sections" },
+          { model: Lesson, as: "lessons" },
+          "display_order",
+          "ASC",
+        ],
+      ],
+    });
+
+    if (!course) {
+        return res.status(404).json({ success: false, message: "Course not found" });
+    }
+
+    // Return mock enrollment
+    return res.json({
+      success: true,
+      data: {
+        enrollment_id: 0,
+        student_id: req.user.id,
+        course_id: courseId,
+        status: "active",
+        course: course,
+        lessonProgress: [],
+      },
+    });
+  }
 
   if (!enrollment) {
     return res
@@ -815,3 +893,4 @@ module.exports = {
   getMyStats,
   getMyActivityFeed,
 };
+

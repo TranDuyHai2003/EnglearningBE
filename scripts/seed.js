@@ -110,7 +110,30 @@ const createAdminUsers = async () => {
     last_login: faker.date.recent({ days: 7 }),
   });
 
-  return { systemAdmin, supportAdmin };
+  // Create specific test accounts
+  const testStudent = await createOrUpdateUser({
+    email: "student@gmail.com",
+    password_hash: "password",
+    full_name: "Test Student",
+    role: "student",
+    status: "active",
+    phone: "0901234567",
+    avatar_url: faker.image.urlPicsumPhotos({ width: 200, height: 200 }),
+    last_login: new Date(),
+  });
+
+  const testInstructor = await createOrUpdateUser({
+    email: "teacher@gmail.com",
+    password_hash: "password",
+    full_name: "Test Instructor",
+    role: "instructor",
+    status: "active",
+    phone: "0909876543",
+    avatar_url: faker.image.urlPicsumPhotos({ width: 200, height: 200 }),
+    last_login: new Date(),
+  });
+
+  return { systemAdmin, supportAdmin, testStudent, testInstructor };
 };
 
 const createInstructors = async (count = 8) => {
@@ -273,11 +296,7 @@ const createCourseContent = async (course, tags) => {
   const lessonsForCourse = [];
   const quizzesForCourse = [];
   const youtubeVideoIds = [
-    "jfKfPfyJRdk", // What is JavaScript?
-    "W6NZfCO5SIk", // JavaScript Tutorial for Beginners
-    "PkZNo7MFNFg", // Learn JavaScript - Full Course for Beginners
-    "hdI2bqOjy3c", // JavaScript Crash Course For Beginners
-    "c-I5S_sTw9o", // Build a Netflix Clone with React
+    "ofPPsEXbEKM", // User provided: Single video for all lessons
   ];
   await course.setTags(randomSubset(tags, 2, 4).map((tag) => tag.tag_id));
 
@@ -879,11 +898,14 @@ const main = async () => {
       await sequelize.sync();
     }
 
-    const { systemAdmin, supportAdmin } = await createAdminUsers();
+    const { systemAdmin, supportAdmin, testStudent, testInstructor } =
+      await createAdminUsers();
     const categories = await seedCategories();
     const tags = await seedTags();
     const instructors = await createInstructors();
+    instructors.push(testInstructor); // Add test instructor
     const students = await createStudents();
+    students.push(testStudent); // Add test student
     await createInstructorProfiles(instructors, supportAdmin);
 
     const { courses, contentByCourse } = await createCourses(

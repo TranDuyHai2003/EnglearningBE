@@ -17,9 +17,13 @@ const QaReply = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
-    reply_text: {
+    content: {
       type: DataTypes.TEXT,
       allowNull: false,
+    },
+    is_helpful: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
     },
   },
   {

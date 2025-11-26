@@ -2,11 +2,14 @@ const {
   User,
   Course,
   InstructorProfile,
+  Lesson,
+  Section,
   Enrollment,
   Transaction,
   SystemSetting,
   SupportTicket,
   SupportReply,
+  Notification,
   sequelize,
 } = require("../models");
 const asyncHandler = require("../utils/asyncHandler");
@@ -353,6 +356,202 @@ const getMetricsTimeseries = asyncHandler(async (req, res) => {
   });
 });
 
+
+
+const getPendingCourses = asyncHandler(async (req, res) => {
+  const { limit, offset, page } = getPagination(req.query);
+  const courses = await Course.findAndCountAll({
+    where: { approval_status: "pending" },
+    include: [
+      {
+        model: User,
+        as: "instructor",
+        attributes: ["user_id", "full_name", "email", "avatar_url"],
+        include: [
+          {
+            model: InstructorProfile,
+            as: "instructorProfile",
+            attributes: ["profile_id"],
+          },
+        ],
+      },
+    ],
+    order: [["created_at", "DESC"]],
+    limit,
+    offset,
+  });
+
+  res.json({
+    success: true,
+    data: courses.rows,
+    meta: {
+      total: courses.count,
+      page,
+      limit,
+      total_pages: Math.ceil(courses.count / limit),
+    },
+  });
+});
+
+const getPendingLessons = asyncHandler(async (req, res) => {
+  const { limit, offset, page } = getPagination(req.query);
+  const lessons = await Lesson.findAndCountAll({
+    where: { approval_status: "pending" },
+    include: [
+      {
+        model: Section,
+        as: "section",
+        attributes: ["section_id", "title"],
+        include: [
+          {
+            model: Course,
+            as: "course",
+            attributes: ["course_id", "title"],
+            include: [
+              {
+                model: User,
+                as: "instructor",
+                attributes: ["user_id", "full_name"],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    order: [["created_at", "DESC"]],
+    limit,
+    offset,
+  });
+
+  res.json({
+    success: true,
+    data: lessons.rows,
+    meta: {
+      total: lessons.count,
+      page,
+      limit,
+      total_pages: Math.ceil(lessons.count / limit),
+    },
+  });
+});
+
+const approveCourse = asyncHandler(async (req, res) => {
+  const course = await Course.findByPk(req.params.id);
+  if (!course) {
+    return res.status(404).json({ success: false, message: "Course not found" });
+  }
+
+  await course.update({
+    status: "published",
+    approval_status: "approved",
+    rejection_reason: null,
+    reviewed_by: req.user.id,
+    reviewed_at: new Date(),
+    published_at: new Date(),
+  });
+
+  // Send notification
+  await Notification.create({
+    user_id: course.instructor_id,
+    type: "course",
+    title: "Khóa học được duyệt",
+    content: `Khóa học "${course.title}" của bạn đã được duyệt và xuất bản.`,
+    is_read: false,
+  });
+
+  res.json({ success: true, message: "Course approved", data: course });
+});
+
+const rejectCourse = asyncHandler(async (req, res) => {
+  const { reason } = req.body;
+  if (!reason) {
+    return res.status(400).json({ success: false, message: "Rejection reason required" });
+  }
+
+  const course = await Course.findByPk(req.params.id);
+  if (!course) {
+    return res.status(404).json({ success: false, message: "Course not found" });
+  }
+
+  await course.update({
+    status: "rejected",
+    approval_status: "rejected",
+    rejection_reason: reason,
+    reviewed_by: req.user.id,
+    reviewed_at: new Date(),
+  });
+
+  // Send notification
+  await Notification.create({
+    user_id: course.instructor_id,
+    type: "course",
+    title: "Khóa học bị từ chối",
+    content: `Khóa học "${course.title}" bị từ chối. Lý do: ${reason}`,
+    is_read: false,
+  });
+
+  res.json({ success: true, message: "Course rejected", data: course });
+});
+
+const approveLesson = asyncHandler(async (req, res) => {
+  const lesson = await Lesson.findByPk(req.params.id);
+  if (!lesson) {
+    return res.status(404).json({ success: false, message: "Lesson not found" });
+  }
+
+  await lesson.update({
+    approval_status: "approved",
+    rejection_reason: null,
+  });
+
+  // Get course to find instructor
+  const section = await Section.findByPk(lesson.section_id);
+  const course = await Course.findByPk(section.course_id);
+
+  // Send notification
+  await Notification.create({
+    user_id: course.instructor_id,
+    type: "system",
+    title: "Bài học được duyệt",
+    content: `Bài học "${lesson.title}" trong khóa học "${course.title}" đã được duyệt.`,
+    is_read: false,
+  });
+
+  res.json({ success: true, message: "Lesson approved", data: lesson });
+});
+
+const rejectLesson = asyncHandler(async (req, res) => {
+  const { reason } = req.body;
+  if (!reason) {
+    return res.status(400).json({ success: false, message: "Rejection reason required" });
+  }
+
+  const lesson = await Lesson.findByPk(req.params.id);
+  if (!lesson) {
+    return res.status(404).json({ success: false, message: "Lesson not found" });
+  }
+
+  await lesson.update({
+    approval_status: "rejected",
+    rejection_reason: reason,
+  });
+
+  // Get course to find instructor
+  const section = await Section.findByPk(lesson.section_id);
+  const course = await Course.findByPk(section.course_id);
+
+  // Send notification
+  await Notification.create({
+    user_id: course.instructor_id,
+    type: "system",
+    title: "Bài học bị từ chối",
+    content: `Bài học "${lesson.title}" trong khóa học "${course.title}" bị từ chối. Lý do: ${reason}`,
+    is_read: false,
+  });
+
+  res.json({ success: true, message: "Lesson rejected", data: lesson });
+});
+
 module.exports = {
   dashboardSummary,
   listSettings,
@@ -364,4 +563,10 @@ module.exports = {
   replySupportTicket,
   getActionItems,
   getMetricsTimeseries,
+  getPendingCourses,
+  getPendingLessons,
+  approveCourse,
+  rejectCourse,
+  approveLesson,
+  rejectLesson,
 };

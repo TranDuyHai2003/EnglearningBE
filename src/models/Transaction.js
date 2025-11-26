@@ -55,6 +55,13 @@ const Transaction = sequelize.define(
     refunded_at: {
       type: DataTypes.DATE,
     },
+    stripe_session_id: {
+      type: DataTypes.STRING,
+      unique: true,
+    },
+    stripe_payment_intent: {
+      type: DataTypes.STRING,
+    },
   },
   {
     tableName: "transactions",

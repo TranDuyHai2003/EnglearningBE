@@ -1,5 +1,5 @@
 const express = require("express");
-const { authMiddleware } = require("../middleware/auth");
+const { authMiddleware, optionalAuth } = require("../middleware/auth");
 const { allowRoles, minRole } = require("../middleware/roles");
 const {
   listCourses,
@@ -40,7 +40,7 @@ router.get("/meta/tags", listTags);
 router.get("/", listCourses);
 
 // Lấy thông tin chi tiết của một khóa học
-router.get("/:id", getCourse);
+router.get("/:id", optionalAuth, getCourse);
 
 // =================================================================
 // PROTECTED ROUTES - CÁC ROUTE CẦN XÁC THỰC VÀ PHÂN QUYỀN

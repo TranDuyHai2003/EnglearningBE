@@ -1,45 +1,45 @@
 const { DataTypes } = require("sequelize");
 const { sequelize } = require("../config/database");
 
-const Review = sequelize.define(
-  "Review",
+const ContentReport = sequelize.define(
+  "ContentReport",
   {
-    review_id: {
+    report_id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
       autoIncrement: true,
     },
-    course_id: {
+    reporter_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
     },
-    student_id: {
+    content_type: {
+      type: DataTypes.ENUM("discussion", "reply", "review"),
+      allowNull: false,
+    },
+    content_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
     },
-    rating: {
-      type: DataTypes.INTEGER,
+    reason: {
+      type: DataTypes.TEXT,
       allowNull: false,
-      validate: { min: 1, max: 5 },
     },
-    comment: {
+    status: {
+      type: DataTypes.ENUM("pending", "reviewed", "resolved"),
+      defaultValue: "pending",
+    },
+    admin_note: {
       type: DataTypes.TEXT,
     },
   },
   {
-    tableName: "reviews",
+    tableName: "content_reports",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at",
     underscored: true,
-    indexes: [
-      {
-        unique: true,
-        fields: ["student_id", "course_id"],
-        name: "unique_student_course",
-      },
-    ],
   }
 );
 
-module.exports = Review;
+module.exports = ContentReport;

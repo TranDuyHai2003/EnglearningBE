@@ -24,6 +24,7 @@ const SupportReply = require("./SupportReply");
 const SystemSetting = require("./SystemSetting");
 const Transaction = require("./Transaction");
 const TransactionDetail = require("./TransactionDetail");
+const ContentReport = require("./ContentReport");
 
 // Associations
 User.hasOne(InstructorProfile, { foreignKey: "user_id", as: "instructorProfile" });
@@ -120,6 +121,9 @@ QaReply.belongsTo(QaDiscussion, {
 });
 QaReply.belongsTo(User, { foreignKey: "user_id", as: "user" });
 
+ContentReport.belongsTo(User, { foreignKey: "reporter_id", as: "reporter" });
+User.hasMany(ContentReport, { foreignKey: "reporter_id", as: "reports" });
+
 Message.belongsTo(User, { foreignKey: "sender_id", as: "sender" });
 Message.belongsTo(User, { foreignKey: "receiver_id", as: "receiver" });
 Message.belongsTo(Course, { foreignKey: "course_id", as: "course" });
@@ -178,4 +182,5 @@ module.exports = {
   SystemSetting,
   Transaction,
   TransactionDetail,
+  ContentReport,
 };

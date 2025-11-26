@@ -48,7 +48,22 @@ const listDiscussions = asyncHandler(async (req, res) => {
   const discussions = await QaDiscussion.findAll({
     where,
     include: [
-      { model: QaReply, as: "replies", include: [{ model: User, as: "user" }] },
+      {
+        model: User,
+        as: "student",
+        attributes: ["user_id", "full_name", "avatar_url", "role"],
+      },
+      {
+        model: QaReply,
+        as: "replies",
+        include: [
+          {
+            model: User,
+            as: "user",
+            attributes: ["user_id", "full_name", "avatar_url", "role"],
+          },
+        ],
+      },
     ],
     order: [["created_at", "DESC"]],
   });

@@ -1,34 +1,32 @@
 const express = require("express");
-const { authMiddleware } = require("../middleware/auth");
-const { allowRoles, minRole } = require("../middleware/roles");
-const {
-  addToCart,
-  listTransactions,
-  checkout,
-  requestRefund,
-  webhook,
-} = require("../controllers/paymentController");
-
 const router = express.Router();
+const {
+  createCheckoutSession,
+  handleWebhook,
+  getSessionStatus,
+  getTransactions,
+  requestRefund,
+} = require("../controllers/paymentController");
+const { authMiddleware } = require("../middleware/auth");
 
-router.use(authMiddleware);
+// Webhook route - NO auth middleware, uses raw body
+router.post(
+  "/webhook",
+  express.raw({ type: "application/json" }),
+  handleWebhook
+);
 
-router.post(
-  "/cart",
-  allowRoles("student", "system_admin"),
-  addToCart
-);
-router.get("/transactions", listTransactions);
-router.post(
-  "/checkout",
-  allowRoles("student", "system_admin"),
-  checkout
-);
+const { allowRoles } = require("../middleware/roles");
+
+// Protected routes
+router.post("/create-checkout", authMiddleware, createCheckoutSession);
+router.get("/session/:sessionId", authMiddleware, getSessionStatus);
+router.get("/transactions", authMiddleware, getTransactions);
 router.post(
   "/transactions/:id/refund",
-  allowRoles("student", "support_admin", "system_admin"),
+  authMiddleware,
+  allowRoles("system_admin", "support_admin"),
   requestRefund
 );
-router.post("/webhook", minRole("support_admin"), webhook);
 
 module.exports = router;

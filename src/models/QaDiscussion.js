@@ -17,9 +17,17 @@ const QaDiscussion = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
-    question: {
+    title: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    content: {
       type: DataTypes.TEXT,
       allowNull: false,
+    },
+    is_resolved: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
     },
   },
   {

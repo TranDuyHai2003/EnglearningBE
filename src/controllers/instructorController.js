@@ -12,6 +12,7 @@ const {
   QaReply,
   Lesson,
   Section,
+  Notification,
 } = require("../models");
 const asyncHandler = require("../utils/asyncHandler");
 const { getPagination } = require("../utils/pagination");
@@ -167,6 +168,30 @@ const reviewProfile = asyncHandler(async (req, res) => {
       user.role = "instructor";
       await user.save();
     }
+  }
+
+  // Send notification
+  let notifTitle = "";
+  let notifContent = "";
+  if (status === "approved") {
+    notifTitle = "Hồ sơ giảng viên được duyệt";
+    notifContent = "Chúc mừng! Hồ sơ giảng viên của bạn đã được duyệt. Bạn có thể bắt đầu tạo khóa học.";
+  } else if (status === "rejected") {
+    notifTitle = "Hồ sơ giảng viên bị từ chối";
+    notifContent = `Hồ sơ của bạn bị từ chối. Lý do: ${reason}`;
+  } else if (status === "interviewing") {
+    notifTitle = "Mời phỏng vấn";
+    notifContent = `Bạn có lịch phỏng vấn vào ${interview_date || "sớm nhất"}. Ghi chú: ${interview_notes}`;
+  }
+
+  if (notifTitle) {
+    await Notification.create({
+      user_id: profile.user_id,
+      type: "system",
+      title: notifTitle,
+      content: notifContent,
+      is_read: false,
+    });
   }
 
   res.json({ success: true, data: profile });

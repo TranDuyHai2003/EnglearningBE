@@ -409,16 +409,21 @@ const createLesson = asyncHandler(async (req, res) => {
   }
 
   const lesson = await Lesson.create({
-    section_id: section.section_id,
-    title: req.body.title,
-    description: req.body.description,
-    lesson_type: req.body.lesson_type,
-    video_url: req.body.video_url,
-    video_duration: req.body.video_duration,
-    content: req.body.content,
-    allow_preview: req.body.allow_preview,
-    display_order: req.body.display_order,
-  });
+  section_id: section.section_id,
+  title: req.body.title,
+  description: req.body.description,
+  lesson_type: req.body.lesson_type,
+  video_url: req.body.video_url,
+  video_duration: req.body.video_duration,
+  content: req.body.content,
+  allow_preview: req.body.allow_preview,
+  display_order: req.body.display_order,
+  approval_status:
+    ["system_admin", "support_admin"].includes(req.user.role) ||
+    course.approval_status === "approved"
+      ? "approved"
+      : "pending",
+});
 
   res.status(201).json({ success: true, data: lesson });
 });
