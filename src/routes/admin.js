@@ -27,6 +27,7 @@ router.use(authMiddleware);
 router.get("/dashboard/summary", minRole("support_admin"), dashboardSummary);
 router.get("/action-items", minRole("support_admin"), getActionItems);
 router.get("/metrics/timeseries", minRole("support_admin"), getMetricsTimeseries);
+router.get("/dashboard/metrics", minRole("support_admin"), getMetricsTimeseries);
 
 // Approvals
 router.get("/approvals/courses", minRole("support_admin"), getPendingCourses);

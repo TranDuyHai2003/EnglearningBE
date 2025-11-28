@@ -6,6 +6,8 @@ const {
   getSessionStatus,
   getTransactions,
   requestRefund,
+  resumePayment,
+  cancelTransaction,
 } = require("../controllers/paymentController");
 const { authMiddleware } = require("../middleware/auth");
 
@@ -22,6 +24,20 @@ const { allowRoles } = require("../middleware/roles");
 router.post("/create-checkout", authMiddleware, createCheckoutSession);
 router.get("/session/:sessionId", authMiddleware, getSessionStatus);
 router.get("/transactions", authMiddleware, getTransactions);
+router.post(
+  "/transactions/:id/resume",
+  authMiddleware,
+  allowRoles("student"),
+  resumePayment
+);
+
+router.post(
+  "/transactions/:id/cancel",
+  authMiddleware,
+  allowRoles("student"),
+  cancelTransaction
+);
+
 router.post(
   "/transactions/:id/refund",
   authMiddleware,

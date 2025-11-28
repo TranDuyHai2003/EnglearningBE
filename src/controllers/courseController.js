@@ -9,6 +9,7 @@ const {
   Lesson,
   LessonResource,
   User,
+  Enrollment,
 } = require("../models");
 const asyncHandler = require("../utils/asyncHandler");
 const { getPagination } = require("../utils/pagination");
@@ -247,7 +248,23 @@ const getCourse = asyncHandler(async (req, res) => {
   // và có thể xem khóa học dựa trên các quyền khác (logic này đã có trong các hàm update/delete)
   // ===================== KẾT THÚC SỬA ĐỔI =====================
 
-  res.json({ success: true, data: course });
+  // Check for enrollment if user is logged in
+  let isEnrolled = false;
+  if (req.user) {
+    const enrollment = await Enrollment.findOne({
+      where: {
+        student_id: req.user.id,
+        course_id: course.course_id,
+        status: "active", // Only consider active enrollments
+      },
+    });
+    isEnrolled = !!enrollment;
+  }
+
+  const courseData = course.toJSON();
+  courseData.is_enrolled = isEnrolled;
+
+  res.json({ success: true, data: courseData });
 });
 const changeCourseStatus = asyncHandler(async (req, res) => {
   const course = await Course.findByPk(req.params.id);

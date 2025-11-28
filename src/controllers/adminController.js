@@ -22,6 +22,7 @@ const dashboardSummary = asyncHandler(async (req, res) => {
     totalCourses,
     pendingCourses,
     pendingInstructors,
+    interviewingInstructors,
     totalEnrollments,
     totalRevenue,
   ] = await Promise.all([
@@ -29,6 +30,7 @@ const dashboardSummary = asyncHandler(async (req, res) => {
     Course.count(),
     Course.count({ where: { approval_status: "pending" } }),
     InstructorProfile.count({ where: { approval_status: "pending" } }),
+    InstructorProfile.count({ where: { approval_status: "interviewing" } }),
     Enrollment.count(),
     Transaction.sum("final_amount", { where: { status: "completed" } }),
   ]);
@@ -40,6 +42,7 @@ const dashboardSummary = asyncHandler(async (req, res) => {
       total_courses: totalCourses,
       pending_courses: pendingCourses,
       pending_instructors: pendingInstructors,
+      interviewing_instructors: interviewingInstructors,
       total_enrollments: totalEnrollments,
       total_revenue: Number(totalRevenue || 0),
     },

@@ -22,7 +22,7 @@ const createDiscussion = asyncHandler(async (req, res) => {
   const discussion = await QaDiscussion.create({
     lesson_id: lesson.lesson_id,
     student_id: req.user.id,
-    question: req.body.question,
+    content: req.body.content,
   });
 
   res.status(201).json({ success: true, data: discussion });
@@ -80,7 +80,7 @@ const replyDiscussion = asyncHandler(async (req, res) => {
   const reply = await QaReply.create({
     discussion_id: discussion.discussion_id,
     user_id: req.user.id,
-    reply_text: req.body.reply_text,
+    content: req.body.content,
   });
 
   res.status(201).json({ success: true, data: reply });

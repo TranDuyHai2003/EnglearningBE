@@ -22,6 +22,7 @@ const serializeUser = (user) => ({
   cv_uploaded_at: user.cv_uploaded_at,
   role: user.role,
   status: user.status,
+  created_at: user.created_at,
   last_login: user.last_login,
   instructor_profile: user.instructorProfile
     ? {

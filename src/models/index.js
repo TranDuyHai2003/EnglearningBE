@@ -155,7 +155,10 @@ TransactionDetail.belongsTo(Transaction, {
 });
 TransactionDetail.belongsTo(Course, { foreignKey: "course_id", as: "course" });
 
+const { sequelize } = require("../config/database");
+
 module.exports = {
+  sequelize,
   User,
   InstructorProfile,
   Category,

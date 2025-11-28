@@ -235,14 +235,14 @@ const getDashboardSummary = asyncHandler(async (req, res) => {
   }
 
   // Query thống kê song song
-  const [stats, pendingQuestionsResult, revenueOverTime, enrollmentsOverTime] =
+  const [stats, pendingQuestionsResult, revenueOverTime, enrollmentsOverTime, recentEnrollments, topCourses] =
     await Promise.all([
       // Tổng Enroll, Revenue, Rating
       sequelize.query(
         `SELECT 
             (SELECT COUNT(*) FROM enrollments WHERE course_id IN (:courseIds)) AS "totalEnrollments", 
             (SELECT SUM(td.final_price) FROM transaction_details td JOIN transactions t ON td.transaction_id = t.transaction_id WHERE td.course_id IN (:courseIds) AND t.status = 'completed') AS "totalRevenue", 
-            (SELECT AVG(r.rating) FROM reviews r WHERE r.course_id IN (:courseIds) AND r.status = 'approved') AS "averageRating"`,
+            (SELECT AVG(r.rating) FROM reviews r WHERE r.course_id IN (:courseIds)) AS "averageRating"`,
         {
           replacements: { courseIds },
           type: sequelize.QueryTypes.SELECT,
@@ -327,6 +327,40 @@ const getDashboardSummary = asyncHandler(async (req, res) => {
         ],
         raw: true,
       }),
+      // Recent Enrollments
+      Enrollment.findAll({
+        where: { course_id: courseIds },
+        include: [
+          { model: User, as: "student", attributes: ["full_name", "avatar_url"] },
+          { model: Course, as: "course", attributes: ["title"] },
+        ],
+        order: [["enrolled_at", "DESC"]],
+        limit: 5,
+      }),
+      // Top Courses by Revenue
+      TransactionDetail.findAll({
+        attributes: [
+          "course_id",
+          [sequelize.fn("SUM", sequelize.col("final_price")), "total_revenue"],
+        ],
+        include: [
+          {
+            model: Course,
+            as: "course",
+            attributes: ["title"],
+          },
+          {
+            model: Transaction,
+            as: "transaction",
+            where: { status: "completed" },
+            attributes: [],
+          },
+        ],
+        where: { course_id: courseIds },
+        group: ["TransactionDetail.course_id", "course.course_id"],
+        order: [[sequelize.col("total_revenue"), "DESC"]],
+        limit: 5,
+      }),
     ]);
 
   res.json({
@@ -340,6 +374,8 @@ const getDashboardSummary = asyncHandler(async (req, res) => {
       total_enrollments: Number(stats.totalEnrollments) || 0,
       revenue_over_time: revenueOverTime,
       enrollments_over_time: enrollmentsOverTime,
+      recent_enrollments: recentEnrollments,
+      top_courses: topCourses,
     },
   });
 });
@@ -377,13 +413,13 @@ const getActionItems = asyncHandler(async (req, res) => {
         {
           model: Lesson,
           as: "lesson",
-          attributes: ["title"],
+          attributes: ["lesson_id", "title", "section_id"],
           required: true,
           include: [
             {
               model: Section,
               as: "section",
-              attributes: [],
+              attributes: ["section_id"],
               required: true,
               include: [
                 {

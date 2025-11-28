@@ -136,7 +136,7 @@ const createAdminUsers = async () => {
   return { systemAdmin, supportAdmin, testStudent, testInstructor };
 };
 
-const createInstructors = async (count = 8) => {
+const createInstructors = async (count = 15) => {
   log(`Seeding ${count} instructors...`);
   const instructors = [];
   for (let i = 0; i < count; i += 1) {
@@ -156,7 +156,7 @@ const createInstructors = async (count = 8) => {
   return instructors;
 };
 
-const createStudents = async (count = 35) => {
+const createStudents = async (count = 100) => {
   log(`Seeding ${count} students...`);
   const students = [];
   for (let i = 0; i < count; i += 1) {
@@ -348,6 +348,7 @@ const createCourseContent = async (course, tags) => {
         content: lessonType !== "video" ? faker.lorem.paragraphs(2) : null,
         allow_preview: faker.datatype.boolean(),
         display_order: j,
+        approval_status: "approved",
       });
       lessonsForCourse.push(lesson);
 
@@ -599,9 +600,8 @@ const createTransactions = async (enrollmentsByStudent, courses) => {
       });
 
       const paymentStatus = faker.helpers.weightedArrayElement([
-        { value: "completed", weight: 7 },
-        { value: "pending", weight: 2 },
-        { value: "failed", weight: 1 },
+        { value: "completed", weight: 9 },
+        { value: "refunded", weight: 1 },
       ]);
 
       const transaction = await Transaction.create({
@@ -712,7 +712,8 @@ const createDiscussionsAndMessages = async (
       const discussion = await QaDiscussion.create({
         lesson_id: lesson.lesson_id,
         student_id: enrollment.student_id,
-        question: faker.lorem.sentences(2),
+        title: faker.lorem.sentence(),
+        content: faker.lorem.sentences(2),
       });
 
       if (faker.datatype.boolean()) {
@@ -725,7 +726,7 @@ const createDiscussionsAndMessages = async (
         await QaReply.create({
           discussion_id: discussion.discussion_id,
           user_id: replyUserId,
-          reply_text: faker.lorem.sentences(2),
+          content: faker.lorem.sentences(2),
         });
       }
     }
