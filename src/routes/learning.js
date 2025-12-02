@@ -74,7 +74,6 @@ router.post(
 router.get("/quizzes/:quizId/attempts", listQuizAttempts);
 router.get("/courses/:courseId/content", getMyCourseContent);
 
-// Student Dashboard APIs
 router.get(
   "/resumecourse",
   allowRoles("student", "system_admin"),

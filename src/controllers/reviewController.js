@@ -2,14 +2,10 @@ const asyncHandler = require("express-async-handler");
 const { Review, Course, User, Enrollment } = require("../models");
 const { sequelize } = require("../config/database");
 
-// @desc    Create or update course review
-// @route   POST /api/courses/:courseId/reviews
-// @access  Private (Student only)
 const upsertReview = asyncHandler(async (req, res) => {
   const courseId = parseInt(req.params.courseId);
   const { rating, comment } = req.body;
 
-  // Check if student is enrolled
   const enrollment = await Enrollment.findOne({
     where: {
       student_id: req.user.id,
@@ -24,7 +20,6 @@ const upsertReview = asyncHandler(async (req, res) => {
     });
   }
 
-  // Find or create review
   const [review, created] = await Review.findOrCreate({
     where: {
       student_id: req.user.id,
@@ -40,7 +35,6 @@ const upsertReview = asyncHandler(async (req, res) => {
     await review.update({ rating, comment });
   }
 
-  // Update course average rating
   await updateCourseAverageRating(courseId);
 
   const reviewWithUser = await Review.findByPk(review.review_id, {
@@ -59,9 +53,6 @@ const upsertReview = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Get reviews for a course
-// @route   GET /api/courses/:courseId/reviews
-// @access  Public
 const getCourseReviews = asyncHandler(async (req, res) => {
   const courseId = parseInt(req.params.courseId);
   const { page = 1, limit = 20, rating } = req.query;
@@ -98,9 +89,6 @@ const getCourseReviews = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Get my review for a course
-// @route   GET /api/courses/:courseId/reviews/me
-// @access  Private
 const getMyReview = asyncHandler(async (req, res) => {
   const courseId = parseInt(req.params.courseId);
 
@@ -128,9 +116,6 @@ const getMyReview = asyncHandler(async (req, res) => {
   res.json({ success: true, data: review });
 });
 
-// @desc    Delete my review
-// @route   DELETE /api/courses/:courseId/reviews
-// @access  Private
 const deleteMyReview = asyncHandler(async (req, res) => {
   const courseId = parseInt(req.params.courseId);
 
@@ -150,13 +135,11 @@ const deleteMyReview = asyncHandler(async (req, res) => {
 
   await review.destroy();
 
-  // Update course average rating
   await updateCourseAverageRating(courseId);
 
   res.json({ success: true, message: "Review deleted" });
 });
 
-// Helper function to update course average rating
 async function updateCourseAverageRating(courseId) {
   const result = await Review.findOne({
     where: { course_id: courseId },
@@ -167,7 +150,9 @@ async function updateCourseAverageRating(courseId) {
     raw: true,
   });
 
-  const avgRating = result.avg_rating ? parseFloat(result.avg_rating).toFixed(2) : null;
+  const avgRating = result.avg_rating
+    ? parseFloat(result.avg_rating).toFixed(2)
+    : null;
 
   await Course.update(
     { average_rating: avgRating },

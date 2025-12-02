@@ -2,12 +2,7 @@ const { Op } = require("sequelize");
 const bcryptjs = require("bcryptjs");
 const path = require("path");
 const fs = require("fs");
-const {
-  User,
-  InstructorProfile,
-  Enrollment,
-  Course,
-} = require("../models");
+const { User, InstructorProfile, Enrollment, Course } = require("../models");
 const asyncHandler = require("../utils/asyncHandler");
 const { getPagination } = require("../utils/pagination");
 
@@ -120,7 +115,12 @@ const updateUser = asyncHandler(async (req, res) => {
 
 const updateUserRole = asyncHandler(async (req, res) => {
   const { role } = req.body;
-  const VALID_ROLES = ["student", "instructor", "support_admin", "system_admin"];
+  const VALID_ROLES = [
+    "student",
+    "instructor",
+    "support_admin",
+    "system_admin",
+  ];
   if (!VALID_ROLES.includes(role)) {
     return res.status(400).json({ success: false, message: "Invalid role" });
   }
@@ -148,13 +148,17 @@ const changePassword = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: "User not found" });
   }
 
-  const isSelf = req.user.role === "system_admin" || req.user.id === user.user_id;
+  const isSelf =
+    req.user.role === "system_admin" || req.user.id === user.user_id;
   if (!isSelf && req.user.role !== "support_admin") {
     return res.status(403).json({ success: false, message: "Forbidden" });
   }
 
   if (req.user.id === user.user_id && user.password_hash) {
-    const match = await bcryptjs.compare(current_password || "", user.password_hash);
+    const match = await bcryptjs.compare(
+      current_password || "",
+      user.password_hash
+    );
     if (!match) {
       return res
         .status(400)
@@ -175,10 +179,7 @@ const getUserCourses = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: "User not found" });
   }
 
-  if (
-    req.user.role === "student" &&
-    req.user.id !== userId
-  ) {
+  if (req.user.role === "student" && req.user.id !== userId) {
     return res.status(403).json({ success: false, message: "Forbidden" });
   }
 
@@ -209,7 +210,7 @@ const uploadAvatar = asyncHandler(async (req, res) => {
   if (!req.file) {
     return res.status(400).json({
       success: false,
-      message: "No file uploaded"
+      message: "No file uploaded",
     });
   }
 
@@ -217,28 +218,26 @@ const uploadAvatar = asyncHandler(async (req, res) => {
   const user = await User.findByPk(userId);
 
   if (!user) {
-    // Delete uploaded file if user not found
     fs.unlinkSync(req.file.path);
     return res.status(404).json({ success: false, message: "User not found" });
   }
 
-  const canEdit = req.user.role === "support_admin" ||
-                  req.user.role === "system_admin" ||
-                  req.user.id === user.user_id;
+  const canEdit =
+    req.user.role === "support_admin" ||
+    req.user.role === "system_admin" ||
+    req.user.id === user.user_id;
   if (!canEdit) {
     fs.unlinkSync(req.file.path);
     return res.status(403).json({ success: false, message: "Forbidden" });
   }
 
-  // Delete old avatar if exists
   if (user.avatar_url) {
-    const oldAvatarPath = path.join(__dirname, '../../', user.avatar_url);
+    const oldAvatarPath = path.join(__dirname, "../../", user.avatar_url);
     if (fs.existsSync(oldAvatarPath)) {
       fs.unlinkSync(oldAvatarPath);
     }
   }
 
-  // Update user with new avatar URL
   const avatarUrl = `/uploads/avatars/${req.file.filename}`;
   await user.update({ avatar_url: avatarUrl });
 
@@ -248,8 +247,8 @@ const uploadAvatar = asyncHandler(async (req, res) => {
     data: {
       avatar_url: avatarUrl,
       file_name: req.file.originalname,
-      file_size: req.file.size
-    }
+      file_size: req.file.size,
+    },
   });
 });
 
@@ -257,7 +256,7 @@ const uploadCV = asyncHandler(async (req, res) => {
   if (!req.file) {
     return res.status(400).json({
       success: false,
-      message: "No file uploaded"
+      message: "No file uploaded",
     });
   }
 
@@ -269,28 +268,27 @@ const uploadCV = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: "User not found" });
   }
 
-  const canEdit = req.user.role === "support_admin" ||
-                  req.user.role === "system_admin" ||
-                  req.user.id === user.user_id;
+  const canEdit =
+    req.user.role === "support_admin" ||
+    req.user.role === "system_admin" ||
+    req.user.id === user.user_id;
   if (!canEdit) {
     fs.unlinkSync(req.file.path);
     return res.status(403).json({ success: false, message: "Forbidden" });
   }
 
-  // Delete old CV if exists
   if (user.cv_url) {
-    const oldCVPath = path.join(__dirname, '../../', user.cv_url);
+    const oldCVPath = path.join(__dirname, "../../", user.cv_url);
     if (fs.existsSync(oldCVPath)) {
       fs.unlinkSync(oldCVPath);
     }
   }
 
-  // Update user with new CV information
   const cvUrl = `/uploads/cvs/${req.file.filename}`;
   await user.update({
     cv_url: cvUrl,
     cv_file_name: req.file.originalname,
-    cv_uploaded_at: new Date()
+    cv_uploaded_at: new Date(),
   });
 
   res.json({
@@ -300,8 +298,8 @@ const uploadCV = asyncHandler(async (req, res) => {
       cv_url: cvUrl,
       cv_file_name: req.file.originalname,
       cv_uploaded_at: user.cv_uploaded_at,
-      file_size: req.file.size
-    }
+      file_size: req.file.size,
+    },
   });
 });
 

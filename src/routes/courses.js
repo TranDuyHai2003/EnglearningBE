@@ -28,25 +28,13 @@ const {
 
 const router = express.Router();
 
-// =================================================================
-// PUBLIC ROUTES - CÁC ROUTE CÔNG KHAI, KHÔNG CẦN ĐĂNG NHẬP
-// =================================================================
-
-// Lấy danh sách danh mục và tag để hiển thị cho tất cả người dùng
 router.get("/meta/categories", listCategories);
 router.get("/meta/tags", listTags);
 
-// Lấy danh sách các khóa học (ví dụ: cho trang khám phá khóa học)
 router.get("/", listCourses);
 
-// Lấy thông tin chi tiết của một khóa học
 router.get("/:id", optionalAuth, getCourse);
 
-// =================================================================
-// PROTECTED ROUTES - CÁC ROUTE CẦN XÁC THỰC VÀ PHÂN QUYỀN
-// =================================================================
-
-// --- Quản lý Danh mục & Tag (yêu cầu quyền admin) ---
 router.post(
   "/meta/categories",
   authMiddleware,
@@ -80,7 +68,6 @@ router.delete(
   deleteTag
 );
 
-// --- Quản lý Khóa học (yêu cầu quyền instructor hoặc admin) ---
 router.post(
   "/",
   authMiddleware,
@@ -106,7 +93,6 @@ router.delete(
   deleteCourse
 );
 
-// --- Quản lý Chương học (Section) ---
 router.post(
   "/:courseId/sections",
   authMiddleware,
@@ -126,7 +112,6 @@ router.delete(
   deleteSection
 );
 
-// --- Quản lý Bài học (Lesson) ---
 router.post(
   "/sections/:sectionId/lessons",
   authMiddleware,
@@ -146,7 +131,6 @@ router.delete(
   deleteLesson
 );
 
-// --- Quản lý Tài nguyên Bài học (Resource) ---
 router.post(
   "/lessons/:lessonId/resources",
   authMiddleware,

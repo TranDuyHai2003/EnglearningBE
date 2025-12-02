@@ -9,16 +9,15 @@ const {
   Course,
 } = require("../models");
 
-// @desc    Create a new discussion
-// @route   POST /api/learning/lessons/:lessonId/discussions
-// @access  Private (Student/Instructor)
 const createDiscussion = asyncHandler(async (req, res) => {
   const lessonId = parseInt(req.params.lessonId);
   const { title, content } = req.body;
 
   const lesson = await Lesson.findByPk(lessonId);
   if (!lesson) {
-    return res.status(404).json({ success: false, message: "Lesson not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Lesson not found" });
   }
 
   const discussion = await QaDiscussion.create({
@@ -28,7 +27,6 @@ const createDiscussion = asyncHandler(async (req, res) => {
     content,
   });
 
-  // Send notification to instructor
   const section = await Section.findByPk(lesson.section_id);
   const course = await Course.findByPk(section.course_id);
 
@@ -43,9 +41,6 @@ const createDiscussion = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, data: discussion });
 });
 
-// @desc    Get discussions for a lesson
-// @route   GET /api/learning/lessons/:lessonId/discussions
-// @access  Private
 const getDiscussions = asyncHandler(async (req, res) => {
   const lessonId = parseInt(req.params.lessonId);
   const { page = 1, limit = 20 } = req.query;
@@ -92,9 +87,6 @@ const getDiscussions = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Create a reply to discussion
-// @route   POST /api/learning/discussions/:discussionId/replies
-// @access  Private
 const createReply = asyncHandler(async (req, res) => {
   const discussionId = parseInt(req.params.discussionId);
   const { content } = req.body;
@@ -116,7 +108,9 @@ const createReply = asyncHandler(async (req, res) => {
   });
 
   if (!discussion) {
-    return res.status(404).json({ success: false, message: "Discussion not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Discussion not found" });
   }
 
   const reply = await QaReply.create({
@@ -125,7 +119,6 @@ const createReply = asyncHandler(async (req, res) => {
     content,
   });
 
-  // Send notification to question asker
   if (discussion.student_id !== req.user.id) {
     await Notification.create({
       user_id: discussion.student_id,
@@ -149,9 +142,6 @@ const createReply = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, data: replyWithUser });
 });
 
-// @desc    Mark reply as helpful
-// @route   PATCH /api/learning/replies/:replyId/helpful
-// @access  Private
 const markReplyHelpful = asyncHandler(async (req, res) => {
   const replyId = parseInt(req.params.replyId);
 
@@ -168,7 +158,6 @@ const markReplyHelpful = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: "Reply not found" });
   }
 
-  // Only the question asker can mark replies as helpful
   if (reply.discussion.student_id !== req.user.id) {
     return res.status(403).json({ success: false, message: "Forbidden" });
   }
@@ -178,9 +167,6 @@ const markReplyHelpful = asyncHandler(async (req, res) => {
   res.json({ success: true, data: reply });
 });
 
-// @desc    Mark discussion as resolved
-// @route   PATCH /api/learning/discussions/:discussionId/resolve
-// @access  Private
 const resolveDiscussion = asyncHandler(async (req, res) => {
   const discussionId = parseInt(req.params.discussionId);
 
@@ -201,10 +187,11 @@ const resolveDiscussion = asyncHandler(async (req, res) => {
   });
 
   if (!discussion) {
-    return res.status(404).json({ success: false, message: "Discussion not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Discussion not found" });
   }
 
-  // Only question asker or instructor can resolve
   const canResolve =
     discussion.student_id === req.user.id ||
     discussion.lesson.section.course.instructor_id === req.user.id ||
@@ -219,19 +206,17 @@ const resolveDiscussion = asyncHandler(async (req, res) => {
   res.json({ success: true, data: discussion });
 });
 
-// @desc    Delete discussion
-// @route   DELETE /api/learning/discussions/:discussionId
-// @access  Private
 const deleteDiscussion = asyncHandler(async (req, res) => {
   const discussionId = parseInt(req.params.discussionId);
 
   const discussion = await QaDiscussion.findByPk(discussionId);
 
   if (!discussion) {
-    return res.status(404).json({ success: false, message: "Discussion not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Discussion not found" });
   }
 
-  // Only the creator or admin can delete
   if (
     discussion.student_id !== req.user.id &&
     !["system_admin", "support_admin"].includes(req.user.role)
@@ -244,9 +229,6 @@ const deleteDiscussion = asyncHandler(async (req, res) => {
   res.json({ success: true, message: "Discussion deleted" });
 });
 
-// @desc    Delete reply
-// @route   DELETE /api/learning/replies/:replyId
-// @access  Private
 const deleteReply = asyncHandler(async (req, res) => {
   const replyId = parseInt(req.params.replyId);
 
@@ -256,7 +238,6 @@ const deleteReply = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: "Reply not found" });
   }
 
-  // Only the creator or admin can delete
   if (
     reply.user_id !== req.user.id &&
     !["system_admin", "support_admin"].includes(req.user.role)

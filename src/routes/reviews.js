@@ -8,7 +8,6 @@ const {
 } = require("../controllers/reviewController");
 const { authMiddleware, optionalAuth } = require("../middleware/auth");
 
-// Review routes
 router.post("/:courseId/reviews", authMiddleware, upsertReview);
 router.get("/:courseId/reviews", optionalAuth, getCourseReviews);
 router.get("/:courseId/reviews/me", authMiddleware, getMyReview);

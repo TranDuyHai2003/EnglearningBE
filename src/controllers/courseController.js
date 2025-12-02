@@ -66,19 +66,14 @@ const listCourses = asyncHandler(async (req, res) => {
     ];
   }
 
-  // ===================== SỬA ĐỔI Ở ĐÂY =====================
-  // Sử dụng optional chaining (?.) để kiểm tra req.user có tồn tại không
-  // Nếu req.user là undefined (khách truy cập), các điều kiện này sẽ không chạy và không gây lỗi
   if (req.user?.role === "instructor") {
     where.instructor_id = req.user.id;
   }
 
-  // Đối với student, hoặc khách truy cập đã có sẵn filter, ta đảm bảo chỉ thấy khóa học đã xuất bản
   if (req.user?.role === "student") {
     where.status = "published";
     where.approval_status = "approved";
   }
-  // ===================== KẾT THÚC SỬA ĐỔI =====================
 
   const result = await Course.findAndCountAll({
     where,
@@ -92,7 +87,7 @@ const listCourses = asyncHandler(async (req, res) => {
         model: Category,
         as: "category",
       },
-      // Thêm include instructor để lấy tên giảng viên
+
       {
         model: User,
         as: "instructor",
@@ -102,7 +97,7 @@ const listCourses = asyncHandler(async (req, res) => {
     limit,
     offset,
     order: [["created_at", "DESC"]],
-    distinct: true, // Thêm distinct để tránh lỗi count khi có include many-to-many
+    distinct: true,
   });
 
   res.json({
@@ -206,11 +201,9 @@ const updateCourse = asyncHandler(async (req, res) => {
   res.json({ success: true, data: updatedCourse });
 });
 
-// controllers/courseController.js
-
 const getCourse = asyncHandler(async (req, res) => {
   const course = await Course.findByPk(req.params.id, {
-    include: courseInclude, // courseInclude đã được định nghĩa ở đầu file
+    include: courseInclude,
     order: [
       [{ model: Section, as: "sections" }, "display_order", "ASC"],
       [
@@ -227,35 +220,26 @@ const getCourse = asyncHandler(async (req, res) => {
       .json({ success: false, message: "Course not found" });
   }
 
-  // ===================== SỬA ĐỔI Ở ĐÂY =====================
-  // Kiểm tra vai trò của người dùng một cách an toàn
   const userRole = req.user?.role;
 
-  // Nếu người dùng là student hoặc là khách (userRole là undefined)
-  // thì chỉ cho phép xem các khóa học đã được duyệt và xuất bản.
   if (userRole === "student" || !userRole) {
     if (
       course.status !== "published" ||
       course.approval_status !== "approved"
     ) {
-      // Trả về 404 thay vì 403 để không tiết lộ sự tồn tại của khóa học chưa xuất bản
       return res
         .status(404)
         .json({ success: false, message: "Course not found" });
     }
   }
-  // Các vai trò khác (instructor, admin) sẽ không bị ảnh hưởng bởi điều kiện trên
-  // và có thể xem khóa học dựa trên các quyền khác (logic này đã có trong các hàm update/delete)
-  // ===================== KẾT THÚC SỬA ĐỔI =====================
 
-  // Check for enrollment if user is logged in
   let isEnrolled = false;
   if (req.user) {
     const enrollment = await Enrollment.findOne({
       where: {
         student_id: req.user.id,
         course_id: course.course_id,
-        status: "active", // Only consider active enrollments
+        status: "active",
       },
     });
     isEnrolled = !!enrollment;
@@ -426,21 +410,21 @@ const createLesson = asyncHandler(async (req, res) => {
   }
 
   const lesson = await Lesson.create({
-  section_id: section.section_id,
-  title: req.body.title,
-  description: req.body.description,
-  lesson_type: req.body.lesson_type,
-  video_url: req.body.video_url,
-  video_duration: req.body.video_duration,
-  content: req.body.content,
-  allow_preview: req.body.allow_preview,
-  display_order: req.body.display_order,
-  approval_status:
-    ["system_admin", "support_admin"].includes(req.user.role) ||
-    course.approval_status === "approved"
-      ? "approved"
-      : "pending",
-});
+    section_id: section.section_id,
+    title: req.body.title,
+    description: req.body.description,
+    lesson_type: req.body.lesson_type,
+    video_url: req.body.video_url,
+    video_duration: req.body.video_duration,
+    content: req.body.content,
+    allow_preview: req.body.allow_preview,
+    display_order: req.body.display_order,
+    approval_status:
+      ["system_admin", "support_admin"].includes(req.user.role) ||
+      course.approval_status === "approved"
+        ? "approved"
+        : "pending",
+  });
 
   res.status(201).json({ success: true, data: lesson });
 });

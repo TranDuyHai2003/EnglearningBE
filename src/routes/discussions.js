@@ -11,13 +11,15 @@ const {
 } = require("../controllers/discussionController");
 const { authMiddleware } = require("../middleware/auth");
 
-// Discussion routes
 router.post("/lessons/:lessonId/discussions", authMiddleware, createDiscussion);
 router.get("/lessons/:lessonId/discussions", authMiddleware, getDiscussions);
 router.delete("/discussions/:discussionId", authMiddleware, deleteDiscussion);
-router.patch("/discussions/:discussionId/resolve", authMiddleware, resolveDiscussion);
+router.patch(
+  "/discussions/:discussionId/resolve",
+  authMiddleware,
+  resolveDiscussion
+);
 
-// Reply routes
 router.post("/discussions/:discussionId/replies", authMiddleware, createReply);
 router.patch("/replies/:replyId/helpful", authMiddleware, markReplyHelpful);
 router.delete("/replies/:replyId", authMiddleware, deleteReply);

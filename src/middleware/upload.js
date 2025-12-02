@@ -2,7 +2,6 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { slugify } = require("../utils/slugify");
-// const Busboy = require("busboy"); // Xóa dòng này, không cần thiết
 
 const uploadDirs = {
   avatars: path.join(__dirname, "../../uploads/avatars"),
@@ -10,14 +9,12 @@ const uploadDirs = {
   certificates: path.join(__dirname, "../../uploads/certificates"),
 };
 
-// Tạo thư mục nếu chưa tồn tại
 Object.values(uploadDirs).forEach((dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
 });
 
-// --- HÀM QUAN TRỌNG: Tạo storage và xử lý UTF-8 ---
 const createStorage = (destination) => {
   return multer.diskStorage({
     destination: (req, file, cb) => {
@@ -27,9 +24,6 @@ const createStorage = (destination) => {
       const userId = req.user?.id || "anonymous";
       const timestamp = Date.now();
 
-      // --- FIX LỖI FONT TIẾNG VIỆT (UTF-8) TẠI ĐÂY ---
-      // Multer thường nhận tên file dưới dạng latin1 (ISO-8859-1),
-      // ta cần chuyển nó về Buffer rồi ép sang utf8.
       const originalName = Buffer.from(file.originalname, "latin1").toString(
         "utf8"
       );
@@ -37,7 +31,6 @@ const createStorage = (destination) => {
       const extension = path.extname(originalName);
       const baseName = path.basename(originalName, extension);
 
-      // Slugify tên file để an toàn (vd: "Tài Liệu.pdf" -> "tai-lieu")
       const sanitizedFilename = slugify(baseName);
 
       const uniqueFilename = `${userId}_${timestamp}_${sanitizedFilename}${extension}`;
@@ -47,7 +40,6 @@ const createStorage = (destination) => {
   });
 };
 
-// --- Các bộ lọc file (Giữ nguyên) ---
 const imageFilter = (req, file, cb) => {
   const allowedTypes = /jpeg|jpg|png|gif|webp/;
   const extname = allowedTypes.test(
@@ -81,7 +73,6 @@ const documentFilter = (req, file, cb) => {
   }
 };
 
-// --- Cấu hình Multer ---
 const uploadAvatar = multer({
   storage: createStorage(uploadDirs.avatars),
   fileFilter: imageFilter,
@@ -102,9 +93,7 @@ const uploadCertificate = multer({
 
 const handleUploadErrors = (uploadMiddleware) => {
   return (req, res, next) => {
-    // Gọi middleware upload của multer
     uploadMiddleware(req, res, (err) => {
-      // 1. Xử lý lỗi Multer (Giữ nguyên code cũ)
       if (err instanceof multer.MulterError) {
         if (err.code === "LIMIT_FILE_SIZE") {
           return res
@@ -112,20 +101,16 @@ const handleUploadErrors = (uploadMiddleware) => {
             .json({ success: false, message: "File size exceeds the limit" });
         }
         if (err.code === "LIMIT_UNEXPECTED_FILE") {
-          return res
-            .status(400)
-            .json({
-              success: false,
-              message: "Unexpected field name or too many files",
-            });
+          return res.status(400).json({
+            success: false,
+            message: "Unexpected field name or too many files",
+          });
         }
         return res.status(400).json({ success: false, message: err.message });
       } else if (err) {
         return res.status(400).json({ success: false, message: err.message });
       }
 
-      // 2. === FIX LỖI FONT DB Ở ĐÂY ===
-      // Chuyển đổi tên file trong object req.file để Controller nhận được chuỗi đúng
       if (req.file) {
         req.file.originalname = Buffer.from(
           req.file.originalname,
@@ -133,7 +118,6 @@ const handleUploadErrors = (uploadMiddleware) => {
         ).toString("utf8");
       }
 
-      // Xử lý trường hợp upload nhiều file (req.files)
       if (req.files) {
         if (Array.isArray(req.files)) {
           req.files.forEach((file) => {
@@ -143,7 +127,6 @@ const handleUploadErrors = (uploadMiddleware) => {
             ).toString("utf8");
           });
         } else {
-          // Trường hợp req.files là object (fields)
           Object.values(req.files)
             .flat()
             .forEach((file) => {
@@ -155,7 +138,6 @@ const handleUploadErrors = (uploadMiddleware) => {
         }
       }
 
-      // 3. Chuyển sang Controller xử lý
       next();
     });
   };

@@ -79,7 +79,9 @@ const deleteSetting = asyncHandler(async (req, res) => {
     where: { setting_key: req.params.key },
   });
   if (!setting) {
-    return res.status(404).json({ success: false, message: "Setting not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Setting not found" });
   }
 
   await setting.destroy();
@@ -131,7 +133,9 @@ const createSupportTicket = asyncHandler(async (req, res) => {
 const updateSupportTicket = asyncHandler(async (req, res) => {
   const ticket = await SupportTicket.findByPk(req.params.id);
   if (!ticket) {
-    return res.status(404).json({ success: false, message: "Ticket not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Ticket not found" });
   }
 
   const canUpdate =
@@ -158,7 +162,9 @@ const updateSupportTicket = asyncHandler(async (req, res) => {
 const replySupportTicket = asyncHandler(async (req, res) => {
   const ticket = await SupportTicket.findByPk(req.params.id);
   if (!ticket) {
-    return res.status(404).json({ success: false, message: "Ticket not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Ticket not found" });
   }
 
   const canReply =
@@ -359,8 +365,6 @@ const getMetricsTimeseries = asyncHandler(async (req, res) => {
   });
 });
 
-
-
 const getPendingCourses = asyncHandler(async (req, res) => {
   const { limit, offset, page } = getPagination(req.query);
   const courses = await Course.findAndCountAll({
@@ -441,7 +445,9 @@ const getPendingLessons = asyncHandler(async (req, res) => {
 const approveCourse = asyncHandler(async (req, res) => {
   const course = await Course.findByPk(req.params.id);
   if (!course) {
-    return res.status(404).json({ success: false, message: "Course not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Course not found" });
   }
 
   await course.update({
@@ -453,7 +459,6 @@ const approveCourse = asyncHandler(async (req, res) => {
     published_at: new Date(),
   });
 
-  // Send notification
   await Notification.create({
     user_id: course.instructor_id,
     type: "course",
@@ -468,12 +473,16 @@ const approveCourse = asyncHandler(async (req, res) => {
 const rejectCourse = asyncHandler(async (req, res) => {
   const { reason } = req.body;
   if (!reason) {
-    return res.status(400).json({ success: false, message: "Rejection reason required" });
+    return res
+      .status(400)
+      .json({ success: false, message: "Rejection reason required" });
   }
 
   const course = await Course.findByPk(req.params.id);
   if (!course) {
-    return res.status(404).json({ success: false, message: "Course not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Course not found" });
   }
 
   await course.update({
@@ -484,7 +493,6 @@ const rejectCourse = asyncHandler(async (req, res) => {
     reviewed_at: new Date(),
   });
 
-  // Send notification
   await Notification.create({
     user_id: course.instructor_id,
     type: "course",
@@ -499,7 +507,9 @@ const rejectCourse = asyncHandler(async (req, res) => {
 const approveLesson = asyncHandler(async (req, res) => {
   const lesson = await Lesson.findByPk(req.params.id);
   if (!lesson) {
-    return res.status(404).json({ success: false, message: "Lesson not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Lesson not found" });
   }
 
   await lesson.update({
@@ -507,11 +517,9 @@ const approveLesson = asyncHandler(async (req, res) => {
     rejection_reason: null,
   });
 
-  // Get course to find instructor
   const section = await Section.findByPk(lesson.section_id);
   const course = await Course.findByPk(section.course_id);
 
-  // Send notification
   await Notification.create({
     user_id: course.instructor_id,
     type: "system",
@@ -526,12 +534,16 @@ const approveLesson = asyncHandler(async (req, res) => {
 const rejectLesson = asyncHandler(async (req, res) => {
   const { reason } = req.body;
   if (!reason) {
-    return res.status(400).json({ success: false, message: "Rejection reason required" });
+    return res
+      .status(400)
+      .json({ success: false, message: "Rejection reason required" });
   }
 
   const lesson = await Lesson.findByPk(req.params.id);
   if (!lesson) {
-    return res.status(404).json({ success: false, message: "Lesson not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Lesson not found" });
   }
 
   await lesson.update({
@@ -539,11 +551,9 @@ const rejectLesson = asyncHandler(async (req, res) => {
     rejection_reason: reason,
   });
 
-  // Get course to find instructor
   const section = await Section.findByPk(lesson.section_id);
   const course = await Course.findByPk(section.course_id);
 
-  // Send notification
   await Notification.create({
     user_id: course.instructor_id,
     type: "system",

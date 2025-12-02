@@ -1,4 +1,3 @@
-// Server entry point - Restart trigger
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -29,7 +28,6 @@ app.use(helmet());
 app.use(cors({ origin: env.FRONTEND_URL }));
 app.use(morgan("dev"));
 
-// Stripe webhook MUST be before express.json() to receive raw body
 app.use(
   "/api/payments/webhook",
   express.raw({ type: "application/json" }),
@@ -38,21 +36,20 @@ app.use(
 
 app.use(express.json());
 
-// Serve static files from uploads directory
 app.use("/api/uploads", express.static(path.join(__dirname, "../uploads")));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/instructors", instructorRoutes);
 app.use("/api/courses", courseRoutes);
-app.use("/api/courses", reviewRoutes); // Review routes
+app.use("/api/courses", reviewRoutes);
 app.use("/api/learning", learningRoutes);
-app.use("/api/learning", discussionRoutes); // Discussion routes
+app.use("/api/learning", discussionRoutes);
 app.use("/api/interaction", interactionRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api/notifications", notificationRoutes); // Notification routes
-app.use("/api", moderationRoutes); // Moderation routes
+app.use("/api/notifications", notificationRoutes);
+app.use("/api", moderationRoutes);
 app.use("/api", systemRoutes);
 
 app.get("/health", (req, res) => {

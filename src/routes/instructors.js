@@ -1,4 +1,3 @@
-// src/routes/instructors.js
 const express = require("express");
 const {
   createProfile,
@@ -21,7 +20,6 @@ const { InstructorProfile } = require("../models");
 
 const router = express.Router();
 
-// Middleware nội bộ check Approved (nếu chưa có file riêng)
 const requireApproved = async (req, res, next) => {
   if (req.user.role.includes("admin")) return next();
   const profile = await InstructorProfile.findOne({
@@ -35,23 +33,21 @@ const requireApproved = async (req, res, next) => {
 
 router.use(authMiddleware);
 
-// 1. Nhóm API quản lý Profile (Ai cũng gọi được để xem/sửa hồ sơ của mình)
 router.get(
   "/profiles/my-profile",
-  allowRoles("instructor", "student"), // Cho phép cả student xem nếu họ lỡ đk nhầm
+  allowRoles("instructor", "student"),
   getMyProfile
 );
 router.post("/profiles", allowRoles("student", "instructor"), createProfile);
 router.patch("/profiles", allowRoles("student", "instructor"), updateProfile);
 
-// 2. Nhóm API Upload (Cho phép upload kể cả khi chưa approved để nộp hồ sơ)
 router.post(
   "/upload-cv",
   allowRoles("instructor", "student"),
   uploadCV,
   uploadInstructorCV
 );
-// Upload Certificate cũng vậy, cần upload để nộp hồ sơ
+
 router.post(
   "/upload-certificates",
   allowRoles("instructor", "student"),
@@ -64,27 +60,23 @@ router.delete(
   deleteInstructorCertificate
 );
 
-// 3. Nhóm API Admin (Duyệt/Xem danh sách)
 router.get("/profiles", minRole("support_admin"), listProfiles);
 router.patch("/profiles/:id/review", minRole("support_admin"), reviewProfile);
 router.get("/profiles/:id", minRole("support_admin"), getProfileById);
 
-// 4. Nhóm API Dashboard & Khóa học (CHỈ DÀNH CHO APPROVED INSTRUCTOR)
-// Áp dụng requireApproved để chặn người đang phỏng vấn gọi trộm API
 router.get(
   "/dashboard/summary",
   allowRoles("instructor", "system_admin"),
-  requireApproved, // <--- CHẶN Ở ĐÂY
+  requireApproved,
   getDashboardSummary
 );
 router.get(
   "/dashboard/action-items",
   allowRoles("instructor", "system_admin"),
-  requireApproved, // <--- CHẶN Ở ĐÂY
+  requireApproved,
   getActionItems
 );
 
-// API Public (Ai cũng xem được danh sách khóa học của 1 GV)
 router.get("/:id/courses", getInstructorCourses);
 
 module.exports = router;

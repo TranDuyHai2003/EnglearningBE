@@ -26,8 +26,10 @@ const Transaction = require("./Transaction");
 const TransactionDetail = require("./TransactionDetail");
 const ContentReport = require("./ContentReport");
 
-// Associations
-User.hasOne(InstructorProfile, { foreignKey: "user_id", as: "instructorProfile" });
+User.hasOne(InstructorProfile, {
+  foreignKey: "user_id",
+  as: "instructorProfile",
+});
 InstructorProfile.belongsTo(User, { foreignKey: "user_id", as: "user" });
 
 Category.hasMany(Category, { foreignKey: "parent_id", as: "children" });
@@ -100,7 +102,10 @@ StudentAnswer.belongsTo(QuizAttempt, {
   foreignKey: "attempt_id",
   as: "attempt",
 });
-StudentAnswer.belongsTo(Question, { foreignKey: "question_id", as: "question" });
+StudentAnswer.belongsTo(Question, {
+  foreignKey: "question_id",
+  as: "question",
+});
 StudentAnswer.belongsTo(AnswerOption, {
   foreignKey: "selected_option_id",
   as: "selectedOption",

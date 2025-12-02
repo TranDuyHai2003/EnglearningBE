@@ -1,4 +1,3 @@
-// src/controllers/instructorController.js
 const { sequelize } = require("../config/database");
 const {
   InstructorProfile,
@@ -32,7 +31,6 @@ const getMyProfile = asyncHandler(async (req, res) => {
     ],
   });
 
-  // Trả về null data thay vì 404 để FE dễ xử lý logic (người dùng chưa tạo hồ sơ)
   if (!profile) {
     return res.json({ success: true, data: null });
   }
@@ -46,7 +44,6 @@ const createProfile = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: "User not found" });
   }
 
-  // Kiểm tra nếu đã có hồ sơ
   const existing = await InstructorProfile.findOne({
     where: { user_id: req.user.id },
   });
@@ -64,7 +61,7 @@ const createProfile = asyncHandler(async (req, res) => {
     education: req.body.education,
     experience: req.body.experience,
     certificates: req.body.certificates,
-    cv_url: req.body.cv_url, // Link nhanh hoặc đường dẫn file upload sau
+    cv_url: req.body.cv_url,
     intro_video_url: req.body.intro_video_url,
     approval_status: "pending",
   });
@@ -82,7 +79,6 @@ const updateProfile = asyncHandler(async (req, res) => {
       .json({ success: false, message: "Profile not found" });
   }
 
-  // Logic bảo mật: Nếu đã Approved thì KHÔNG cho phép user tự ý sửa CV/Video qua API updateProfile này
   const isApproved = profile.approval_status === "approved";
 
   await profile.update({
@@ -91,13 +87,11 @@ const updateProfile = asyncHandler(async (req, res) => {
     experience: req.body.experience ?? profile.experience,
     certificates: req.body.certificates ?? profile.certificates,
 
-    // CV & Video: Nếu đã duyệt -> Giữ nguyên. Nếu chưa -> Cho phép sửa.
     cv_url: isApproved ? profile.cv_url : req.body.cv_url ?? profile.cv_url,
     intro_video_url: isApproved
       ? profile.intro_video_url
       : req.body.intro_video_url ?? profile.intro_video_url,
 
-    // Status: Nếu đã duyệt -> Giữ nguyên. Nếu chưa (vd rejected) -> Reset về Pending để duyệt lại.
     approval_status: isApproved ? "approved" : "pending",
     rejection_reason: isApproved ? profile.rejection_reason : null,
   });
@@ -109,7 +103,6 @@ const listProfiles = asyncHandler(async (req, res) => {
   const { limit, offset, page } = getPagination(req.query);
   const where = {};
 
-  // Hỗ trợ filter theo status (pending, interviewing, approved...)
   if (req.query.status) {
     where.approval_status = req.query.status;
   }
@@ -134,11 +127,9 @@ const listProfiles = asyncHandler(async (req, res) => {
   });
 });
 
-// === HÀM REVIEW ĐÃ CẬP NHẬT ===
 const reviewProfile = asyncHandler(async (req, res) => {
   const { status, reason, interview_notes, interview_date } = req.body;
 
-  // 1. Validate status
   if (!["approved", "rejected", "interviewing", "pending"].includes(status)) {
     return res.status(400).json({ success: false, message: "Invalid status" });
   }
@@ -150,7 +141,6 @@ const reviewProfile = asyncHandler(async (req, res) => {
       .json({ success: false, message: "Profile not found" });
   }
 
-  // 2. Cập nhật thông tin Profile
   await profile.update({
     approval_status: status,
     approved_by: status === "approved" ? req.user.id : null,
@@ -160,8 +150,6 @@ const reviewProfile = asyncHandler(async (req, res) => {
     interview_date: interview_date ?? profile.interview_date,
   });
 
-  // 3. Đảm bảo Role User là Instructor (nếu chưa phải)
-  // Chúng ta KHÔNG hạ role về student nữa, giữ role instructor để họ truy cập được /instructor/profile
   if (status === "approved") {
     const user = await User.findByPk(profile.user_id);
     if (user && user.role === "student") {
@@ -170,18 +158,20 @@ const reviewProfile = asyncHandler(async (req, res) => {
     }
   }
 
-  // Send notification
   let notifTitle = "";
   let notifContent = "";
   if (status === "approved") {
     notifTitle = "Hồ sơ giảng viên được duyệt";
-    notifContent = "Chúc mừng! Hồ sơ giảng viên của bạn đã được duyệt. Bạn có thể bắt đầu tạo khóa học.";
+    notifContent =
+      "Chúc mừng! Hồ sơ giảng viên của bạn đã được duyệt. Bạn có thể bắt đầu tạo khóa học.";
   } else if (status === "rejected") {
     notifTitle = "Hồ sơ giảng viên bị từ chối";
     notifContent = `Hồ sơ của bạn bị từ chối. Lý do: ${reason}`;
   } else if (status === "interviewing") {
     notifTitle = "Mời phỏng vấn";
-    notifContent = `Bạn có lịch phỏng vấn vào ${interview_date || "sớm nhất"}. Ghi chú: ${interview_notes}`;
+    notifContent = `Bạn có lịch phỏng vấn vào ${
+      interview_date || "sớm nhất"
+    }. Ghi chú: ${interview_notes}`;
   }
 
   if (notifTitle) {
@@ -205,11 +195,9 @@ const getInstructorCourses = asyncHandler(async (req, res) => {
   res.json({ success: true, data: courses });
 });
 
-// --- DASHBOARD APIS ---
 const getDashboardSummary = asyncHandler(async (req, res) => {
   const instructorId = req.user.id;
 
-  // Lấy danh sách khóa học của giảng viên
   const courseIds = (
     await Course.findAll({
       where: { instructor_id: instructorId },
@@ -234,134 +222,135 @@ const getDashboardSummary = asyncHandler(async (req, res) => {
     });
   }
 
-  // Query thống kê song song
-  const [stats, pendingQuestionsResult, revenueOverTime, enrollmentsOverTime, recentEnrollments, topCourses] =
-    await Promise.all([
-      // Tổng Enroll, Revenue, Rating
-      sequelize.query(
-        `SELECT 
+  const [
+    stats,
+    pendingQuestionsResult,
+    revenueOverTime,
+    enrollmentsOverTime,
+    recentEnrollments,
+    topCourses,
+  ] = await Promise.all([
+    sequelize.query(
+      `SELECT 
             (SELECT COUNT(*) FROM enrollments WHERE course_id IN (:courseIds)) AS "totalEnrollments", 
             (SELECT SUM(td.final_price) FROM transaction_details td JOIN transactions t ON td.transaction_id = t.transaction_id WHERE td.course_id IN (:courseIds) AND t.status = 'completed') AS "totalRevenue", 
             (SELECT AVG(r.rating) FROM reviews r WHERE r.course_id IN (:courseIds)) AS "averageRating"`,
-        {
-          replacements: { courseIds },
-          type: sequelize.QueryTypes.SELECT,
-          plain: true,
-        }
-      ),
-      // Đếm câu hỏi chưa trả lời
-      sequelize.query(
-        `SELECT COUNT(d.discussion_id) as count FROM qa_discussions d 
+      {
+        replacements: { courseIds },
+        type: sequelize.QueryTypes.SELECT,
+        plain: true,
+      }
+    ),
+
+    sequelize.query(
+      `SELECT COUNT(d.discussion_id) as count FROM qa_discussions d 
          JOIN lessons l ON d.lesson_id = l.lesson_id 
          JOIN sections s ON l.section_id = s.section_id 
          WHERE s.course_id IN (:courseIds) 
          AND NOT EXISTS (SELECT 1 FROM qa_replies r WHERE r.discussion_id = d.discussion_id)`,
-        {
-          replacements: { courseIds },
-          type: sequelize.QueryTypes.SELECT,
-          plain: true,
-        }
-      ),
-      // Revenue Over Time
-      TransactionDetail.findAll({
-        attributes: [
-          [
-            sequelize.fn(
-              "date_trunc",
-              "month",
-              sequelize.col("transaction.created_at")
-            ),
-            "month",
-          ],
-          [sequelize.fn("SUM", sequelize.col("final_price")), "revenue"],
-        ],
-        include: [
-          {
-            model: Transaction,
-            as: "transaction",
-            where: { status: "completed" },
-            attributes: [],
-          },
-        ],
-        where: { course_id: courseIds },
-        group: [
+      {
+        replacements: { courseIds },
+        type: sequelize.QueryTypes.SELECT,
+        plain: true,
+      }
+    ),
+
+    TransactionDetail.findAll({
+      attributes: [
+        [
           sequelize.fn(
             "date_trunc",
             "month",
             sequelize.col("transaction.created_at")
           ),
+          "month",
         ],
-        order: [
-          [
-            sequelize.fn(
-              "date_trunc",
-              "month",
-              sequelize.col("transaction.created_at")
-            ),
-            "ASC",
-          ],
-        ],
-        raw: true,
-      }),
-      // Enrollments Over Time
-      Enrollment.findAll({
-        attributes: [
-          [
-            sequelize.fn("date_trunc", "month", sequelize.col("enrolled_at")),
+        [sequelize.fn("SUM", sequelize.col("final_price")), "revenue"],
+      ],
+      include: [
+        {
+          model: Transaction,
+          as: "transaction",
+          where: { status: "completed" },
+          attributes: [],
+        },
+      ],
+      where: { course_id: courseIds },
+      group: [
+        sequelize.fn(
+          "date_trunc",
+          "month",
+          sequelize.col("transaction.created_at")
+        ),
+      ],
+      order: [
+        [
+          sequelize.fn(
+            "date_trunc",
             "month",
-          ],
-          [
-            sequelize.fn("COUNT", sequelize.col("enrollment_id")),
-            "enrollments",
-          ],
+            sequelize.col("transaction.created_at")
+          ),
+          "ASC",
         ],
-        where: { course_id: courseIds },
-        group: [
+      ],
+      raw: true,
+    }),
+
+    Enrollment.findAll({
+      attributes: [
+        [
           sequelize.fn("date_trunc", "month", sequelize.col("enrolled_at")),
+          "month",
         ],
-        order: [
-          [
-            sequelize.fn("date_trunc", "month", sequelize.col("enrolled_at")),
-            "ASC",
-          ],
+        [sequelize.fn("COUNT", sequelize.col("enrollment_id")), "enrollments"],
+      ],
+      where: { course_id: courseIds },
+      group: [
+        sequelize.fn("date_trunc", "month", sequelize.col("enrolled_at")),
+      ],
+      order: [
+        [
+          sequelize.fn("date_trunc", "month", sequelize.col("enrolled_at")),
+          "ASC",
         ],
-        raw: true,
-      }),
-      // Recent Enrollments
-      Enrollment.findAll({
-        where: { course_id: courseIds },
-        include: [
-          { model: User, as: "student", attributes: ["full_name", "avatar_url"] },
-          { model: Course, as: "course", attributes: ["title"] },
-        ],
-        order: [["enrolled_at", "DESC"]],
-        limit: 5,
-      }),
-      // Top Courses by Revenue
-      TransactionDetail.findAll({
-        attributes: [
-          "course_id",
-          [sequelize.fn("SUM", sequelize.col("final_price")), "total_revenue"],
-        ],
-        include: [
-          {
-            model: Course,
-            as: "course",
-            attributes: ["title"],
-          },
-          {
-            model: Transaction,
-            as: "transaction",
-            where: { status: "completed" },
-            attributes: [],
-          },
-        ],
-        where: { course_id: courseIds },
-        group: ["TransactionDetail.course_id", "course.course_id"],
-        order: [[sequelize.col("total_revenue"), "DESC"]],
-        limit: 5,
-      }),
-    ]);
+      ],
+      raw: true,
+    }),
+
+    Enrollment.findAll({
+      where: { course_id: courseIds },
+      include: [
+        { model: User, as: "student", attributes: ["full_name", "avatar_url"] },
+        { model: Course, as: "course", attributes: ["title"] },
+      ],
+      order: [["enrolled_at", "DESC"]],
+      limit: 5,
+    }),
+
+    TransactionDetail.findAll({
+      attributes: [
+        "course_id",
+        [sequelize.fn("SUM", sequelize.col("final_price")), "total_revenue"],
+      ],
+      include: [
+        {
+          model: Course,
+          as: "course",
+          attributes: ["title"],
+        },
+        {
+          model: Transaction,
+          as: "transaction",
+          where: { status: "completed" },
+          attributes: [],
+        },
+      ],
+      where: { course_id: courseIds },
+      group: ["TransactionDetail.course_id", "course.course_id"],
+      order: [[sequelize.col("total_revenue"), "DESC"]],
+      limit: 5,
+    }),
+  ]);
 
   res.json({
     success: true,
@@ -464,7 +453,6 @@ const getActionItems = asyncHandler(async (req, res) => {
   });
 });
 
-// --- FILE UPLOAD HANDLERS ---
 const uploadInstructorCV = asyncHandler(async (req, res) => {
   if (!req.file) {
     return res
@@ -477,14 +465,13 @@ const uploadInstructorCV = asyncHandler(async (req, res) => {
   });
 
   if (!profile) {
-    fs.unlinkSync(req.file.path); // Xóa file rác
+    fs.unlinkSync(req.file.path);
     return res.status(404).json({
       success: false,
       message: "Instructor profile not found. Please create a profile first.",
     });
   }
 
-  // Xóa file cũ nếu tồn tại
   if (profile.cv_url) {
     const oldCVPath = path.join(__dirname, "../../", profile.cv_url);
     if (fs.existsSync(oldCVPath)) {
@@ -585,7 +572,6 @@ const deleteInstructorCertificate = asyncHandler(async (req, res) => {
       .json({ success: false, message: "Certificate not found" });
   }
 
-  // Xóa file vật lý
   const filePath = path.join(__dirname, "../../", certificateUrl);
   if (fs.existsSync(filePath)) {
     fs.unlinkSync(filePath);

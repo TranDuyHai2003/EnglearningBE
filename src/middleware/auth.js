@@ -32,7 +32,6 @@ const optionalAuth = (req, res, next) => {
     }
     next();
   } catch (error) {
-    // Token invalid or expired, just ignore and proceed as guest
     next();
   }
 };

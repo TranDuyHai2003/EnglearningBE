@@ -9,10 +9,8 @@ const {
 const { authMiddleware } = require("../middleware/auth");
 const { allowRoles } = require("../middleware/roles");
 
-// Public report endpoint
 router.post("/reports", authMiddleware, reportContent);
 
-// Admin-only endpoints
 router.get(
   "/admin/reports",
   authMiddleware,

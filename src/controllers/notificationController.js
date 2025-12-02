@@ -1,9 +1,6 @@
 const asyncHandler = require("express-async-handler");
 const { Notification } = require("../models");
 
-// @desc    Get notifications for current user
-// @route   GET /api/notifications
-// @access  Private
 const getNotifications = asyncHandler(async (req, res) => {
   const { page = 1, limit = 20, is_read } = req.query;
   const offset = (page - 1) * limit;
@@ -32,9 +29,6 @@ const getNotifications = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Mark notification as read
-// @route   PATCH /api/notifications/:id/read
-// @access  Private
 const markAsRead = asyncHandler(async (req, res) => {
   const notificationId = parseInt(req.params.id);
 
@@ -57,9 +51,6 @@ const markAsRead = asyncHandler(async (req, res) => {
   res.json({ success: true, data: notification });
 });
 
-// @desc    Mark all notifications as read
-// @route   PATCH /api/notifications/mark-all-read
-// @access  Private
 const markAllAsRead = asyncHandler(async (req, res) => {
   const [updatedCount] = await Notification.update(
     { is_read: true },
@@ -78,9 +69,6 @@ const markAllAsRead = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Delete notification
-// @route   DELETE /api/notifications/:id
-// @access  Private
 const deleteNotification = asyncHandler(async (req, res) => {
   const notificationId = parseInt(req.params.id);
 

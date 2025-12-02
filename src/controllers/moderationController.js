@@ -1,13 +1,15 @@
 const asyncHandler = require("express-async-handler");
-const { ContentReport, User, QaDiscussion, QaReply, Review } = require("../models");
+const {
+  ContentReport,
+  User,
+  QaDiscussion,
+  QaReply,
+  Review,
+} = require("../models");
 
-// @desc    Report content
-// @route   POST /api/reports
-// @access  Private
 const reportContent = asyncHandler(async (req, res) => {
   const { content_type, content_id, reason } = req.body;
 
-  // Validate content type
   if (!["discussion", "reply", "review"].includes(content_type)) {
     return res.status(400).json({
       success: false,
@@ -15,7 +17,6 @@ const reportContent = asyncHandler(async (req, res) => {
     });
   }
 
-  // Verify content exists
   let contentExists = false;
   switch (content_type) {
     case "discussion":
@@ -36,7 +37,6 @@ const reportContent = asyncHandler(async (req, res) => {
     });
   }
 
-  // Check if already reported by this user
   const existingReport = await ContentReport.findOne({
     where: {
       reporter_id: req.user.id,
@@ -62,9 +62,6 @@ const reportContent = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, data: report });
 });
 
-// @desc    Get all reports (Admin only)
-// @route   GET /api/admin/reports
-// @access  Private (Admin)
 const getReports = asyncHandler(async (req, res) => {
   const { page = 1, limit = 20, status, content_type } = req.query;
   const offset = (page - 1) * limit;
@@ -83,7 +80,7 @@ const getReports = asyncHandler(async (req, res) => {
       },
     ],
     order: [
-      ["status", "ASC"], // pending first
+      ["status", "ASC"],
       ["created_at", "DESC"],
     ],
     limit: parseInt(limit),
@@ -102,9 +99,6 @@ const getReports = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Update report status
-// @route   PATCH /api/admin/reports/:reportId
-// @access  Private (Admin)
 const updateReport = asyncHandler(async (req, res) => {
   const reportId = parseInt(req.params.reportId);
   const { status, admin_note } = req.body;
@@ -126,9 +120,6 @@ const updateReport = asyncHandler(async (req, res) => {
   res.json({ success: true, data: report });
 });
 
-// @desc    Delete reported content
-// @route   DELETE /api/admin/content/:type/:id
-// @access  Private (Admin)
 const deleteReportedContent = asyncHandler(async (req, res) => {
   const { type, id } = req.params;
   const contentId = parseInt(id);
@@ -165,7 +156,6 @@ const deleteReportedContent = asyncHandler(async (req, res) => {
 
   await content.destroy();
 
-  // Update related reports to resolved
   await ContentReport.update(
     { status: "resolved", admin_note: "Content deleted by admin" },
     {
