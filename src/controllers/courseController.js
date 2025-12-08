@@ -420,8 +420,7 @@ const createLesson = asyncHandler(async (req, res) => {
     allow_preview: req.body.allow_preview,
     display_order: req.body.display_order,
     approval_status:
-      ["system_admin", "support_admin"].includes(req.user.role) ||
-      course.approval_status === "approved"
+      ["system_admin", "support_admin"].includes(req.user.role)
         ? "approved"
         : "pending",
   });
@@ -607,6 +606,25 @@ const deleteTag = asyncHandler(async (req, res) => {
   res.json({ success: true, message: "Tag removed" });
 });
 
+const reorderSections = asyncHandler(async (req, res) => {
+  const { sections } = req.body; // Expect array of { section_id, display_order }
+  if (!sections || !Array.isArray(sections)) {
+    return res.status(400).json({ success: false, message: "Invalid data" });
+  }
+
+  // Transaction for safety
+  await sequelize.transaction(async (t) => {
+    for (const item of sections) {
+      await Section.update(
+        { display_order: item.display_order },
+        { where: { section_id: item.section_id }, transaction: t }
+      );
+    }
+  });
+
+  res.json({ success: true, message: "Sections reordered" });
+});
+
 module.exports = {
   listCourses,
   createCourse,
@@ -630,4 +648,5 @@ module.exports = {
   createTag,
   updateTag,
   deleteTag,
+  reorderSections,
 };

@@ -26,9 +26,11 @@ const requireApproved = async (req, res, next) => {
     where: { user_id: req.user.id },
   });
   if (profile && profile.approval_status === "approved") return next();
-  return res
-    .status(403)
-    .json({ success: false, message: "Account not approved yet" });
+  return res.status(403).json({
+    success: false,
+    message: "Account not approved yet",
+    code: "ACCOUNT_NOT_APPROVED",
+  });
 };
 
 router.use(authMiddleware);

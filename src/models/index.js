@@ -25,6 +25,7 @@ const SystemSetting = require("./SystemSetting");
 const Transaction = require("./Transaction");
 const TransactionDetail = require("./TransactionDetail");
 const ContentReport = require("./ContentReport");
+const Certificate = require("./Certificate");
 
 User.hasOne(InstructorProfile, {
   foreignKey: "user_id",
@@ -160,6 +161,15 @@ TransactionDetail.belongsTo(Transaction, {
 });
 TransactionDetail.belongsTo(Course, { foreignKey: "course_id", as: "course" });
 
+User.hasMany(Certificate, { foreignKey: "student_id", as: "certificates" });
+Certificate.belongsTo(User, { foreignKey: "student_id", as: "student" });
+
+Course.hasMany(Certificate, { foreignKey: "course_id", as: "certificates" });
+Certificate.belongsTo(Course, { foreignKey: "course_id", as: "course" });
+
+Enrollment.hasOne(Certificate, { foreignKey: "enrollment_id", as: "certificate" });
+Certificate.belongsTo(Enrollment, { foreignKey: "enrollment_id", as: "enrollment" });
+
 const { sequelize } = require("../config/database");
 
 module.exports = {
@@ -191,4 +201,5 @@ module.exports = {
   Transaction,
   TransactionDetail,
   ContentReport,
+  Certificate,
 };

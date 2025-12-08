@@ -14,7 +14,9 @@ const {
   LessonResource,
   User,
   Transaction,
+  Certificate,
 } = require("../models");
+const crypto = require("crypto");
 const asyncHandler = require("../utils/asyncHandler");
 const { getPagination } = require("../utils/pagination");
 
@@ -74,7 +76,11 @@ const listEnrollments = asyncHandler(async (req, res) => {
 
   const result = await Enrollment.findAndCountAll({
     where,
-    include: [{ model: Course, as: "course" }],
+    where,
+    include: [
+      { model: Course, as: "course" },
+      { model: Certificate, as: "certificate" },
+    ],
     limit,
     offset,
     order: [["enrolled_at", "DESC"]],
@@ -209,6 +215,25 @@ const recordLessonProgress = asyncHandler(async (req, res) => {
     completed_at:
       completionPercentage === 100 ? new Date() : enrollment.completed_at,
   });
+
+  // Create certificate if course is completed
+  if (completionPercentage === 100) {
+    const existingCert = await Certificate.findOne({
+      where: { enrollment_id: enrollment.enrollment_id },
+    });
+
+    if (!existingCert) {
+      const code = `CERT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+      await Certificate.create({
+        student_id: req.user.id,
+        course_id: enrollment.course_id,
+        enrollment_id: enrollment.enrollment_id,
+        certificate_code: code,
+        issued_at: new Date(),
+        verify_url: `${process.env.FRONTEND_URL || "http://localhost:3000"}/verify/${code}`,
+      });
+    }
+  }
 
   res.json({
     success: true,
@@ -389,7 +414,11 @@ const startQuizAttempt = asyncHandler(async (req, res) => {
   if (quiz.max_attempts && attempts >= quiz.max_attempts) {
     return res
       .status(400)
-      .json({ success: false, message: "Attempt limit reached" });
+      .json({
+        success: false,
+        message: "Attempt limit reached",
+        code: "ATTEMPT_LIMIT_REACHED",
+      });
   }
 
   const attempt = await QuizAttempt.create({

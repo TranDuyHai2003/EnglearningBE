@@ -390,6 +390,23 @@ CREATE TABLE system_settings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- =====================
+-- Bảng Certificates
+-- =====================
+CREATE TABLE certificates (
+    certificate_id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    student_id INT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    course_id INT NOT NULL REFERENCES courses(course_id) ON DELETE CASCADE,
+    enrollment_id INT NOT NULL REFERENCES enrollments(enrollment_id) ON DELETE CASCADE,
+    certificate_code VARCHAR(100) UNIQUE NOT NULL,
+    issued_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    expiry_date TIMESTAMP WITH TIME ZONE,
+    verify_url VARCHAR(500),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE (enrollment_id)
+);
+
 
 CREATE INDEX idx_courses_instructor ON courses(instructor_id);
 CREATE INDEX idx_lessons_section ON lessons(section_id);

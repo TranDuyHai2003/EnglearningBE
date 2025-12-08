@@ -24,6 +24,7 @@ const {
   createTag,
   updateTag,
   deleteTag,
+  reorderSections,
 } = require("../controllers/courseController");
 
 const router = express.Router();
@@ -110,6 +111,13 @@ router.delete(
   authMiddleware,
   allowRoles("instructor", "system_admin"),
   deleteSection
+);
+
+router.patch(
+  "/:id/sections/reorder",
+  authMiddleware,
+  allowRoles("instructor", "system_admin"),
+  reorderSections
 );
 
 router.post(

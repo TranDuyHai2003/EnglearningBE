@@ -19,6 +19,7 @@ const {
   getMyStats,
   getMyActivityFeed,
 } = require("../controllers/learningController");
+const { downloadCertificate } = require("../controllers/certificateController");
 
 const router = express.Router();
 
@@ -84,6 +85,12 @@ router.get(
   "/my-activity-feed",
   allowRoles("student", "system_admin"),
   getMyActivityFeed
+);
+
+router.get(
+  "/certificates/:courseId/download",
+  allowRoles("student", "system_admin"),
+  downloadCertificate
 );
 
 module.exports = router;
