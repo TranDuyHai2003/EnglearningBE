@@ -27,6 +27,15 @@ const Lesson = sequelize.define(
     video_url: {
       type: DataTypes.STRING,
     },
+    video_bucket: {
+      type: DataTypes.STRING,
+    },
+    video_key: {
+      type: DataTypes.STRING,
+    },
+    video_uploaded_at: {
+      type: DataTypes.DATE,
+    },
     video_duration: {
       type: DataTypes.INTEGER,
       defaultValue: 0,

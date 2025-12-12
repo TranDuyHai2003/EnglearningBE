@@ -21,6 +21,7 @@ const discussionRoutes = require("./routes/discussions");
 const reviewRoutes = require("./routes/reviews");
 const moderationRoutes = require("./routes/moderation");
 const notificationRoutes = require("./routes/notifications");
+const storageRoutes = require("./routes/storage");
 
 const app = express();
 
@@ -54,6 +55,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api", moderationRoutes);
 app.use("/api", systemRoutes);
+app.use("/api", storageRoutes);
 
 app.get("/health", (req, res) => {
   res.json({

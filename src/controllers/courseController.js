@@ -15,6 +15,12 @@ const asyncHandler = require("../utils/asyncHandler");
 const { getPagination } = require("../utils/pagination");
 const { slugify } = require("../utils/slugify");
 
+const parseDateInput = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
 const courseInclude = [
   {
     model: User,
@@ -415,6 +421,9 @@ const createLesson = asyncHandler(async (req, res) => {
     description: req.body.description,
     lesson_type: req.body.lesson_type,
     video_url: req.body.video_url,
+    video_bucket: req.body.video_bucket,
+    video_key: req.body.video_key,
+    video_uploaded_at: parseDateInput(req.body.video_uploaded_at),
     video_duration: req.body.video_duration,
     content: req.body.content,
     allow_preview: req.body.allow_preview,
@@ -449,6 +458,12 @@ const updateLesson = asyncHandler(async (req, res) => {
     description: req.body.description ?? lesson.description,
     lesson_type: req.body.lesson_type ?? lesson.lesson_type,
     video_url: req.body.video_url ?? lesson.video_url,
+    video_bucket: req.body.video_bucket ?? lesson.video_bucket,
+    video_key: req.body.video_key ?? lesson.video_key,
+    video_uploaded_at:
+      req.body.video_uploaded_at !== undefined
+        ? parseDateInput(req.body.video_uploaded_at)
+        : lesson.video_uploaded_at,
     video_duration: req.body.video_duration ?? lesson.video_duration,
     content: req.body.content ?? lesson.content,
     allow_preview: req.body.allow_preview ?? lesson.allow_preview,

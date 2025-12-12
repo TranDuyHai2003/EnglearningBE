@@ -9,6 +9,63 @@ const {
   Notification,
 } = require("../models");
 
+const finalizeStripeTransaction = async (transaction, session) => {
+  if (!transaction) {
+    return null;
+  }
+
+  if (transaction.status !== "completed") {
+    await transaction.update({
+      status: "completed",
+      stripe_payment_intent: session.payment_intent,
+      payment_at: new Date(),
+    });
+
+    const detail = transaction.details?.[0];
+    const courseId = detail?.course_id;
+
+    if (courseId && transaction.student_id) {
+      await Enrollment.findOrCreate({
+        where: {
+          student_id: transaction.student_id,
+          course_id: courseId,
+        },
+        defaults: {
+          status: "active",
+        },
+      });
+
+      let courseTitle = detail?.course?.title;
+      if (!courseTitle) {
+        const course = await Course.findByPk(courseId);
+        courseTitle = course?.title;
+      }
+
+      if (courseTitle) {
+        await Notification.create({
+          user_id: transaction.student_id,
+          type: "payment",
+          title: "Thanh toán thành công",
+          content: `Bạn đã thanh toán thành công khóa học ${courseTitle}. Chúc bạn học tốt!`,
+          is_read: false,
+        });
+      }
+    }
+  }
+
+  await transaction.reload({
+    include: [
+      {
+        model: TransactionDetail,
+        as: "details",
+        include: [{ model: Course, as: "course" }],
+      },
+    ],
+  });
+
+  return transaction;
+};
+
 const createCheckoutSession = asyncHandler(async (req, res) => {
   const { courseId } = req.body;
   const studentId = req.user.id;
@@ -117,36 +174,21 @@ const handleWebhook = asyncHandler(async (req, res) => {
 
     const transaction = await Transaction.findOne({
       where: { stripe_session_id: session.id },
-      include: [{ model: TransactionDetail, as: "details" }],
+      include: [
+        {
+          model: TransactionDetail,
+          as: "details",
+          include: [{ model: Course, as: "course" }],
+        },
+      ],
     });
 
     if (!transaction) {
       console.error("Transaction not found for session:", session.id);
-      return res.status(404).send("Transaction not found");
+      return res.status(200).json({ received: true });
     }
 
-    await transaction.update({
-      status: "completed",
-      stripe_payment_intent: session.payment_intent,
-      payment_at: new Date(),
-    });
-
-    const courseId = transaction.details[0].course_id;
-    const studentId = transaction.student_id;
-
-    await Enrollment.create({
-      student_id: studentId,
-      course_id: courseId,
-      status: "active",
-    });
-
-    await Notification.create({
-      user_id: studentId,
-      type: "payment",
-      title: "Thanh toán thành công",
-      content: `Bạn đã thanh toán thành công khóa học ${transaction.details[0].course.title}. Chúc bạn học tốt!`,
-      is_read: false,
-    });
+    await finalizeStripeTransaction(transaction, session);
   }
 
   res.json({ received: true });
@@ -157,7 +199,7 @@ const getSessionStatus = asyncHandler(async (req, res) => {
 
   const session = await stripe.checkout.sessions.retrieve(sessionId);
 
-  const transaction = await Transaction.findOne({
+  let transaction = await Transaction.findOne({
     where: { stripe_session_id: sessionId },
     include: [
       {
@@ -167,6 +209,10 @@ const getSessionStatus = asyncHandler(async (req, res) => {
       },
     ],
   });
+
+  if (session.payment_status === "paid" && transaction) {
+    transaction = await finalizeStripeTransaction(transaction, session);
+  }
 
   res.json({
     success: true,
