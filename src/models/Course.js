@@ -50,6 +50,29 @@ const Course = sequelize.define(
       type: DataTypes.INTEGER,
       defaultValue: 0,
     },
+    level_cefr: {
+      type: DataTypes.ENUM(
+        "general",
+        "beginner",
+        "A1",
+        "A2",
+        "B1",
+        "B2",
+        "C1",
+        "C2",
+        "TOEIC",
+        "IELTS",
+        "advanced"
+      ),
+      defaultValue: "general",
+    },
+    skill_focus: {
+      type: DataTypes.ARRAY(DataTypes.STRING),
+      defaultValue: [],
+    },
+    track_id: {
+      type: DataTypes.INTEGER,
+    },
     status: {
       type: DataTypes.ENUM(
         "draft",

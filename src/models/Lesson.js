@@ -24,6 +24,25 @@ const Lesson = sequelize.define(
       type: DataTypes.ENUM("video", "document", "quiz", "assignment"),
       allowNull: false,
     },
+    cefr_level: {
+      type: DataTypes.ENUM(
+        "general",
+        "beginner",
+        "A1",
+        "A2",
+        "B1",
+        "B2",
+        "C1",
+        "C2",
+        "TOEIC",
+        "IELTS",
+        "advanced"
+      ),
+    },
+    skill_focus: {
+      type: DataTypes.ARRAY(DataTypes.STRING),
+      defaultValue: [],
+    },
     video_url: {
       type: DataTypes.STRING,
     },

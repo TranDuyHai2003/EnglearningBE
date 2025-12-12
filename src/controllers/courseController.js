@@ -10,6 +10,7 @@ const {
   LessonResource,
   User,
   Enrollment,
+  Track,
 } = require("../models");
 const asyncHandler = require("../utils/asyncHandler");
 const { getPagination } = require("../utils/pagination");
@@ -19,6 +20,19 @@ const parseDateInput = (value) => {
   if (!value) return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const normalizeSkillFocus = (input, fallback = []) => {
+  if (Array.isArray(input)) {
+    return input;
+  }
+  if (typeof input === "string" && input.trim()) {
+    return input
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return fallback;
 };
 
 const courseInclude = [
@@ -46,6 +60,10 @@ const courseInclude = [
     model: CourseTag,
     as: "tags",
     through: { attributes: [] },
+  },
+  {
+    model: Track,
+    as: "track",
   },
 ];
 
@@ -131,6 +149,9 @@ const createCourse = asyncHandler(async (req, res) => {
     price: req.body.price,
     discount_price: req.body.discount_price,
     duration_hours: req.body.duration_hours,
+    level_cefr: req.body.level_cefr || "general",
+    skill_focus: normalizeSkillFocus(req.body.skill_focus, []),
+    track_id: req.body.track_id,
   };
 
   const result = await sequelize.transaction(async (t) => {
@@ -180,6 +201,11 @@ const updateCourse = asyncHandler(async (req, res) => {
     price: req.body.price ?? course.price,
     discount_price: req.body.discount_price ?? course.discount_price,
     duration_hours: req.body.duration_hours ?? course.duration_hours,
+    level_cefr: req.body.level_cefr ?? course.level_cefr,
+    skill_focus: req.body.skill_focus
+      ? normalizeSkillFocus(req.body.skill_focus, course.skill_focus)
+      : course.skill_focus,
+    track_id: req.body.track_id ?? course.track_id,
   };
 
   const updatedCourse = await sequelize.transaction(async (t) => {
@@ -420,6 +446,8 @@ const createLesson = asyncHandler(async (req, res) => {
     title: req.body.title,
     description: req.body.description,
     lesson_type: req.body.lesson_type,
+    cefr_level: req.body.cefr_level || course.level_cefr || "general",
+    skill_focus: normalizeSkillFocus(req.body.skill_focus, []),
     video_url: req.body.video_url,
     video_bucket: req.body.video_bucket,
     video_key: req.body.video_key,
@@ -457,6 +485,10 @@ const updateLesson = asyncHandler(async (req, res) => {
     title: req.body.title ?? lesson.title,
     description: req.body.description ?? lesson.description,
     lesson_type: req.body.lesson_type ?? lesson.lesson_type,
+    cefr_level: req.body.cefr_level ?? lesson.cefr_level,
+    skill_focus: req.body.skill_focus
+      ? normalizeSkillFocus(req.body.skill_focus, lesson.skill_focus)
+      : lesson.skill_focus,
     video_url: req.body.video_url ?? lesson.video_url,
     video_bucket: req.body.video_bucket ?? lesson.video_bucket,
     video_key: req.body.video_key ?? lesson.video_key,

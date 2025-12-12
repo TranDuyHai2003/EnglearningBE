@@ -1,4 +1,5 @@
 const express = require("express");
+const http = require("http");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
@@ -22,8 +23,12 @@ const reviewRoutes = require("./routes/reviews");
 const moderationRoutes = require("./routes/moderation");
 const notificationRoutes = require("./routes/notifications");
 const storageRoutes = require("./routes/storage");
+const trackRoutes = require("./routes/tracks");
+const liveSessionRoutes = require("./routes/liveSessions");
+const { initLiveSocket } = require("./services/liveSessionSocket");
 
 const app = express();
+const server = http.createServer(app);
 
 app.use(helmet());
 app.use(cors({
@@ -56,6 +61,8 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api", moderationRoutes);
 app.use("/api", systemRoutes);
 app.use("/api", storageRoutes);
+app.use("/api/tracks", trackRoutes);
+app.use("/api/live-sessions", liveSessionRoutes);
 
 app.get("/health", (req, res) => {
   res.json({
@@ -77,8 +84,9 @@ app.use(errorHandler);
 const startServer = async () => {
   try {
     await initDatabase();
+    initLiveSocket(server);
 
-    app.listen(env.PORT, () => {
+    server.listen(env.PORT, () => {
       console.log("\n" + "=".repeat(60));
       console.log("SERVER STARTED");
       console.log(`URL : http://localhost:${env.PORT}`);

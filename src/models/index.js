@@ -26,6 +26,11 @@ const Transaction = require("./Transaction");
 const TransactionDetail = require("./TransactionDetail");
 const ContentReport = require("./ContentReport");
 const Certificate = require("./Certificate");
+const Track = require("./Track");
+const TrackLesson = require("./TrackLesson");
+const TrackEnrollment = require("./TrackEnrollment");
+const LiveSession = require("./LiveSession");
+const SessionRegistration = require("./SessionRegistration");
 
 User.hasOne(InstructorProfile, {
   foreignKey: "user_id",
@@ -39,6 +44,8 @@ Category.belongsTo(Category, { foreignKey: "parent_id", as: "parent" });
 User.hasMany(Course, { foreignKey: "instructor_id", as: "courses" });
 Course.belongsTo(User, { foreignKey: "instructor_id", as: "instructor" });
 Course.belongsTo(Category, { foreignKey: "category_id", as: "category" });
+Course.belongsTo(Track, { foreignKey: "track_id", as: "track" });
+Track.hasMany(Course, { foreignKey: "track_id", as: "courses" });
 
 Course.belongsToMany(CourseTag, {
   through: CourseTagMapping,
@@ -61,6 +68,37 @@ Lesson.belongsTo(Section, { foreignKey: "section_id", as: "section" });
 
 Lesson.hasMany(LessonResource, { foreignKey: "lesson_id", as: "resources" });
 LessonResource.belongsTo(Lesson, { foreignKey: "lesson_id", as: "lesson" });
+Lesson.hasMany(TrackLesson, { foreignKey: "lesson_id", as: "trackSteps" });
+TrackLesson.belongsTo(Lesson, { foreignKey: "lesson_id", as: "lesson" });
+Track.hasMany(TrackLesson, { foreignKey: "track_id", as: "trackLessons" });
+TrackLesson.belongsTo(Track, { foreignKey: "track_id", as: "track" });
+
+Track.hasMany(TrackEnrollment, { foreignKey: "track_id", as: "enrollments" });
+TrackEnrollment.belongsTo(Track, { foreignKey: "track_id", as: "track" });
+TrackEnrollment.belongsTo(User, { foreignKey: "student_id", as: "student" });
+User.hasMany(TrackEnrollment, { foreignKey: "student_id", as: "trackEnrollments" });
+
+LiveSession.belongsTo(Course, { foreignKey: "course_id", as: "course" });
+Course.hasMany(LiveSession, { foreignKey: "course_id", as: "liveSessions" });
+LiveSession.belongsTo(User, { foreignKey: "instructor_id", as: "instructor" });
+User.hasMany(LiveSession, { foreignKey: "instructor_id", as: "hostedSessions" });
+
+SessionRegistration.belongsTo(LiveSession, {
+  foreignKey: "session_id",
+  as: "session",
+});
+LiveSession.hasMany(SessionRegistration, {
+  foreignKey: "session_id",
+  as: "registrations",
+});
+SessionRegistration.belongsTo(User, {
+  foreignKey: "student_id",
+  as: "student",
+});
+User.hasMany(SessionRegistration, {
+  foreignKey: "student_id",
+  as: "sessionRegistrations",
+});
 
 Lesson.hasOne(Quiz, { foreignKey: "lesson_id", as: "quiz" });
 Quiz.belongsTo(Lesson, { foreignKey: "lesson_id", as: "lesson" });
@@ -202,4 +240,9 @@ module.exports = {
   TransactionDetail,
   ContentReport,
   Certificate,
+  Track,
+  TrackLesson,
+  TrackEnrollment,
+  LiveSession,
+  SessionRegistration,
 };
