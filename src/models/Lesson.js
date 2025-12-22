@@ -52,6 +52,13 @@ const Lesson = sequelize.define(
     video_key: {
       type: DataTypes.STRING,
     },
+    video_mime_type: {
+      type: DataTypes.STRING,
+      defaultValue: "video/webm",
+    },
+    video_size_bytes: {
+      type: DataTypes.BIGINT,
+    },
     video_uploaded_at: {
       type: DataTypes.DATE,
     },

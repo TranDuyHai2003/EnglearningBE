@@ -411,14 +411,14 @@ const startQuizAttempt = asyncHandler(async (req, res) => {
   const attempts = await QuizAttempt.count({
     where: { quiz_id: quiz.quiz_id, student_id: req.user.id },
   });
-  if (quiz.max_attempts && attempts >= quiz.max_attempts) {
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "Attempt limit reached",
-        code: "ATTEMPT_LIMIT_REACHED",
-      });
+
+  const allowedAttempts = Math.max(quiz.max_attempts || 0, 3);
+  if (allowedAttempts && attempts >= allowedAttempts) {
+    return res.status(400).json({
+      success: false,
+      message: "Attempt limit reached",
+      code: "ATTEMPT_LIMIT_REACHED",
+    });
   }
 
   const attempt = await QuizAttempt.create({

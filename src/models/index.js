@@ -31,6 +31,10 @@ const TrackLesson = require("./TrackLesson");
 const TrackEnrollment = require("./TrackEnrollment");
 const LiveSession = require("./LiveSession");
 const SessionRegistration = require("./SessionRegistration");
+const FlashcardDeck = require("./FlashcardDeck");
+const Flashcard = require("./Flashcard");
+const FlashcardUserState = require("./FlashcardUserState");
+const FlashcardReview = require("./FlashcardReview");
 
 User.hasOne(InstructorProfile, {
   foreignKey: "user_id",
@@ -198,6 +202,56 @@ TransactionDetail.belongsTo(Transaction, {
   as: "transaction",
 });
 TransactionDetail.belongsTo(Course, { foreignKey: "course_id", as: "course" });
+
+User.hasMany(FlashcardDeck, {
+  foreignKey: "owner_user_id",
+  as: "flashcardDecks",
+});
+FlashcardDeck.belongsTo(User, { foreignKey: "owner_user_id", as: "owner" });
+FlashcardDeck.belongsTo(Lesson, { foreignKey: "lesson_id", as: "lesson" });
+Lesson.hasMany(FlashcardDeck, { foreignKey: "lesson_id", as: "flashcardDecks" });
+
+FlashcardDeck.hasMany(Flashcard, { foreignKey: "deck_id", as: "cards" });
+Flashcard.belongsTo(FlashcardDeck, { foreignKey: "deck_id", as: "deck" });
+Flashcard.belongsTo(User, { foreignKey: "owner_user_id", as: "creator" });
+
+FlashcardUserState.belongsTo(User, { foreignKey: "user_id", as: "user" });
+User.hasMany(FlashcardUserState, {
+  foreignKey: "user_id",
+  as: "flashcardStates",
+});
+FlashcardUserState.belongsTo(Flashcard, {
+  foreignKey: "card_id",
+  as: "card",
+});
+Flashcard.hasMany(FlashcardUserState, {
+  foreignKey: "card_id",
+  as: "userStates",
+});
+FlashcardUserState.belongsTo(FlashcardDeck, {
+  foreignKey: "deck_id",
+  as: "deck",
+});
+FlashcardDeck.hasMany(FlashcardUserState, {
+  foreignKey: "deck_id",
+  as: "userStates",
+});
+
+FlashcardReview.belongsTo(User, { foreignKey: "user_id", as: "reviewer" });
+User.hasMany(FlashcardReview, {
+  foreignKey: "user_id",
+  as: "flashcardReviews",
+});
+FlashcardReview.belongsTo(FlashcardDeck, {
+  foreignKey: "deck_id",
+  as: "deck",
+});
+FlashcardDeck.hasMany(FlashcardReview, {
+  foreignKey: "deck_id",
+  as: "reviews",
+});
+FlashcardReview.belongsTo(Flashcard, { foreignKey: "card_id", as: "card" });
+Flashcard.hasMany(FlashcardReview, { foreignKey: "card_id", as: "reviews" });
 
 User.hasMany(Certificate, { foreignKey: "student_id", as: "certificates" });
 Certificate.belongsTo(User, { foreignKey: "student_id", as: "student" });

@@ -92,6 +92,8 @@ const uploadLectureVideo = asyncHandler(async (req, res) => {
     video_key: key,
     video_url: key,
     video_uploaded_at: new Date(),
+    video_mime_type: req.file.mimetype || "video/webm",
+    video_size_bytes: req.file.size || null,
   });
 
   res.status(201).json({
