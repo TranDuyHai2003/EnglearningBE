@@ -100,7 +100,14 @@ const listSupportTickets = asyncHandler(async (req, res) => {
 
   const result = await SupportTicket.findAndCountAll({
     where,
-    include: [{ model: SupportReply, as: "replies" }],
+    include: [
+      { model: SupportReply, as: "replies" },
+      {
+        model: User,
+        as: "user",
+        attributes: ["user_id", "full_name", "email", "avatar_url"],
+      },
+    ],
     limit,
     offset,
     order: [["created_at", "DESC"]],
@@ -182,6 +189,40 @@ const replySupportTicket = asyncHandler(async (req, res) => {
   });
 
   res.status(201).json({ success: true, data: reply });
+});
+
+const getSupportTicketDetails = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const ticket = await SupportTicket.findByPk(id, {
+    include: [
+      {
+        model: User,
+        as: "user",
+        attributes: ["user_id", "full_name", "email", "avatar_url"],
+      },
+      {
+        model: SupportReply,
+        as: "replies",
+        include: [
+          {
+            model: User,
+            as: "user",
+            attributes: ["user_id", "full_name", "email", "avatar_url", "role"],
+          },
+        ],
+      },
+    ],
+    order: [[{ model: SupportReply, as: "replies" }, "created_at", "ASC"]],
+  });
+
+  if (!ticket) {
+    return res
+      .status(404)
+      .json({ success: false, message: "Ticket not found" });
+  }
+
+  res.json({ success: true, data: ticket });
 });
 
 const getActionItems = asyncHandler(async (req, res) => {
@@ -582,4 +623,5 @@ module.exports = {
   rejectCourse,
   approveLesson,
   rejectLesson,
+  getSupportTicketDetails,
 };

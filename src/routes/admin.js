@@ -18,6 +18,7 @@ const {
   rejectCourse,
   approveLesson,
   rejectLesson,
+  getSupportTicketDetails,
 } = require("../controllers/adminController");
 
 const router = express.Router();
@@ -72,6 +73,7 @@ router.patch(
   minRole("support_admin"),
   updateSupportTicket
 );
+router.get("/support/tickets/:id", getSupportTicketDetails);
 router.post("/support/tickets/:id/replies", replySupportTicket);
 
 module.exports = router;

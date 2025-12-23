@@ -138,7 +138,7 @@ const createReview = asyncHandler(async (req, res) => {
     student_id: req.user.id,
     rating: req.body.rating,
     comment: req.body.comment,
-    status: "pending",
+    status: "approved",
   });
 
   res.status(201).json({ success: true, data: review });
@@ -170,7 +170,14 @@ const listReviews = asyncHandler(async (req, res) => {
 
   const result = await Review.findAndCountAll({
     where,
-    include: [{ model: Course, as: "course" }],
+    include: [
+      { model: Course, as: "course" },
+      {
+        model: User,
+        as: "student",
+        attributes: ["user_id", "full_name", "avatar_url"],
+      },
+    ],
     limit,
     offset,
     order: [["created_at", "DESC"]],

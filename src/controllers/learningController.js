@@ -80,6 +80,11 @@ const listEnrollments = asyncHandler(async (req, res) => {
     include: [
       { model: Course, as: "course" },
       { model: Certificate, as: "certificate" },
+      {
+        model: User,
+        as: "student",
+        attributes: ["user_id", "full_name", "email", "avatar_url"],
+      },
     ],
     limit,
     offset,
@@ -411,15 +416,15 @@ const startQuizAttempt = asyncHandler(async (req, res) => {
   const attempts = await QuizAttempt.count({
     where: { quiz_id: quiz.quiz_id, student_id: req.user.id },
   });
-  if (quiz.max_attempts && attempts >= quiz.max_attempts) {
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "Attempt limit reached",
-        code: "ATTEMPT_LIMIT_REACHED",
-      });
-  }
+  // if (quiz.max_attempts && attempts >= quiz.max_attempts) {
+  //   return res
+  //     .status(400)
+  //     .json({
+  //       success: false,
+  //       message: "Attempt limit reached",
+  //       code: "ATTEMPT_LIMIT_REACHED",
+  //     });
+  // }
 
   const attempt = await QuizAttempt.create({
     quiz_id: quiz.quiz_id,
