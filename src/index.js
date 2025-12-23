@@ -26,6 +26,9 @@ const storageRoutes = require("./routes/storage");
 const trackRoutes = require("./routes/tracks");
 const liveSessionRoutes = require("./routes/liveSessions");
 const { initLiveSocket } = require("./services/liveSessionSocket");
+const videoRoutes = require("./modules/videos/videos.routes");
+const flashcardRoutes = require("./modules/flashcards/flashcards.routes");
+const dictionaryRoutes = require("./modules/dictionary/dictionary.routes");
 
 const app = express();
 const server = http.createServer(app);
@@ -63,6 +66,9 @@ app.use("/api", systemRoutes);
 app.use("/api", storageRoutes);
 app.use("/api/tracks", trackRoutes);
 app.use("/api/live-sessions", liveSessionRoutes);
+app.use("/api/videos", videoRoutes);
+app.use("/api/flashcards", flashcardRoutes);
+app.use("/api/dict", dictionaryRoutes);
 
 app.get("/health", (req, res) => {
   res.json({

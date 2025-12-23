@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
-    "seed": "node scripts/seed.js"
+    "seed": "node scripts/seed.js",
+    "test": "jest"
   },
   "keywords": [
     "e-learning",
@@ -35,9 +36,11 @@
     "pg": "^8.16.3",
     "sequelize": "^6.37.7",
     "stripe": "^20.0.0",
-    "ws": "^8.18.3"
+    "ws": "^8.18.3",
+    "zod": "^4.2.1"
   },
   "devDependencies": {
+    "jest": "^30.2.0",
     "nodemon": "^3.1.10"
   }
 }
