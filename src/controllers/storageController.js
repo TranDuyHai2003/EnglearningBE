@@ -63,6 +63,8 @@ const uploadLectureVideo = asyncHandler(async (req, res) => {
     }
   };
 
+  console.log(`[Storage] Uploading file: ${req.file.originalname}, Size: ${req.file.size}, Path: ${req.file.path}`);
+
   const fileBody =
     req.file.buffer || (req.file.path && createReadStream(req.file.path));
 
@@ -72,6 +74,7 @@ const uploadLectureVideo = asyncHandler(async (req, res) => {
       key,
       body: fileBody,
       contentType: req.file.mimetype,
+      contentLength: req.file.size,
     });
   } catch (error) {
     await cleanupTempFile();

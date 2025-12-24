@@ -100,6 +100,14 @@ router.post(
   allowRoles("instructor", "system_admin"),
   createSection
 );
+
+router.patch(
+  "/:id/sections/reorder",
+  authMiddleware,
+  allowRoles("instructor", "system_admin"),
+  reorderSections
+);
+
 router.patch(
   "/:courseId/sections/:sectionId",
   authMiddleware,
@@ -113,12 +121,7 @@ router.delete(
   deleteSection
 );
 
-router.patch(
-  "/:id/sections/reorder",
-  authMiddleware,
-  allowRoles("instructor", "system_admin"),
-  reorderSections
-);
+
 
 router.post(
   "/sections/:sectionId/lessons",

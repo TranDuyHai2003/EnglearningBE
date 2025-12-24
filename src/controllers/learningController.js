@@ -15,6 +15,7 @@ const {
   User,
   Transaction,
   Certificate,
+  FlashcardDeck,
 } = require("../models");
 const crypto = require("crypto");
 const asyncHandler = require("../utils/asyncHandler");
@@ -583,6 +584,8 @@ const getMyCourseContent = asyncHandler(async (req, res) => {
           {
             model: Section,
             as: "sections",
+            required: false,
+            where: isAdminOrInstructor ? {} : { approval_status: "approved" },
             include: [
               {
                 model: Lesson,
@@ -592,6 +595,7 @@ const getMyCourseContent = asyncHandler(async (req, res) => {
                 include: [
                   { model: LessonResource, as: "resources" },
                   { model: Quiz, as: "quiz", attributes: ["quiz_id", "title"] },
+                  { model: FlashcardDeck, as: "flashcardDecks" },
                 ],
               },
             ],
@@ -635,6 +639,7 @@ const getMyCourseContent = asyncHandler(async (req, res) => {
               include: [
                 { model: LessonResource, as: "resources" },
                 { model: Quiz, as: "quiz", attributes: ["quiz_id", "title"] },
+                { model: FlashcardDeck, as: "flashcardDecks" },
               ],
             },
           ],

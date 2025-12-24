@@ -252,9 +252,15 @@ const getCourse = asyncHandler(async (req, res) => {
       .json({ success: false, message: "Course not found" });
   }
 
+  // Determine if user has privileged access to this course
   const userRole = req.user?.role;
+  const isAdmin = ["system_admin", "support_admin", "content_admin"].includes(userRole);
+  const isOwner = userRole === "instructor" && req.user.id === course.instructor_id;
+  
+  const canViewHidden = isAdmin || isOwner;
 
-  if (userRole === "student" || !userRole) {
+  // If not privileged, ensure course is published
+  if (!canViewHidden) {
     if (
       course.status !== "published" ||
       course.approval_status !== "approved"
@@ -278,6 +284,17 @@ const getCourse = asyncHandler(async (req, res) => {
   }
 
   const courseData = course.toJSON();
+  
+  // Filter hidden lessons and sections for non-privileged users
+  if (!canViewHidden) {
+    courseData.sections = courseData.sections
+      .filter(section => section.approval_status === 'approved')
+      .map(section => ({
+        ...section,
+        lessons: section.lessons.filter(lesson => lesson.approval_status === 'approved')
+      }));
+  }
+
   courseData.is_enrolled = isEnrolled;
 
   res.json({ success: true, data: courseData });
@@ -372,11 +389,19 @@ const createSection = asyncHandler(async (req, res) => {
     return res.status(403).json({ success: false, message: "Forbidden" });
   }
 
+  // Calculate the next display_order
+  const maxOrder = await Section.max("display_order", {
+    where: { course_id: course.course_id },
+  });
+  
+  // If maxOrder is null (no sections), start at 0 (or 1). If not null, increment.
+  const nextOrder = (maxOrder !== null && !isNaN(maxOrder)) ? maxOrder + 1 : 0;
+
   const section = await Section.create({
     course_id: course.course_id,
     title: req.body.title,
     description: req.body.description,
-    display_order: req.body.display_order,
+    display_order: req.body.display_order ?? nextOrder,
   });
 
   res.status(201).json({ success: true, data: section });
@@ -391,6 +416,12 @@ const updateSection = asyncHandler(async (req, res) => {
   }
 
   const course = await Course.findByPk(section.course_id);
+  if (!course) {
+    return res
+      .status(404)
+      .json({ success: false, message: "Course not found for this section" });
+  }
+
   if (
     req.user.role !== "system_admin" &&
     req.user.id !== course.instructor_id
@@ -415,6 +446,12 @@ const deleteSection = asyncHandler(async (req, res) => {
       .json({ success: false, message: "Section not found" });
   }
   const course = await Course.findByPk(section.course_id);
+  if (!course) {
+    return res
+      .status(404)
+      .json({ success: false, message: "Course not found for this section" });
+  }
+
   if (
     req.user.role !== "system_admin" &&
     req.user.id !== course.instructor_id
@@ -434,6 +471,12 @@ const createLesson = asyncHandler(async (req, res) => {
       .json({ success: false, message: "Section not found" });
   }
   const course = await Course.findByPk(section.course_id);
+  if (!course) {
+    return res
+      .status(404)
+      .json({ success: false, message: "Course not found for this section" });
+  }
+
   if (
     req.user.role !== "system_admin" &&
     req.user.id !== course.instructor_id
@@ -474,6 +517,12 @@ const updateLesson = asyncHandler(async (req, res) => {
   }
   const section = await Section.findByPk(lesson.section_id);
   const course = await Course.findByPk(section.course_id);
+  if (!course) {
+    return res
+      .status(404)
+      .json({ success: false, message: "Course not found for this lesson" });
+  }
+
   if (
     req.user.role !== "system_admin" &&
     req.user.id !== course.instructor_id
@@ -514,6 +563,12 @@ const deleteLesson = asyncHandler(async (req, res) => {
   }
   const section = await Section.findByPk(lesson.section_id);
   const course = await Course.findByPk(section.course_id);
+  if (!course) {
+    return res
+      .status(404)
+      .json({ success: false, message: "Course not found for this lesson" });
+  }
+
   if (
     req.user.role !== "system_admin" &&
     req.user.id !== course.instructor_id
@@ -534,6 +589,12 @@ const addLessonResource = asyncHandler(async (req, res) => {
   }
   const section = await Section.findByPk(lesson.section_id);
   const course = await Course.findByPk(section.course_id);
+  if (!course) {
+    return res
+      .status(404)
+      .json({ success: false, message: "Course not found for this section" });
+  }
+
   if (
     req.user.role !== "system_admin" &&
     req.user.id !== course.instructor_id
@@ -562,6 +623,12 @@ const deleteLessonResource = asyncHandler(async (req, res) => {
   const lesson = await Lesson.findByPk(resource.lesson_id);
   const section = await Section.findByPk(lesson.section_id);
   const course = await Course.findByPk(section.course_id);
+  if (!course) {
+    return res
+      .status(404)
+      .json({ success: false, message: "Course not found for this section" });
+  }
+
   if (
     req.user.role !== "system_admin" &&
     req.user.id !== course.instructor_id
@@ -654,17 +721,39 @@ const deleteTag = asyncHandler(async (req, res) => {
 });
 
 const reorderSections = asyncHandler(async (req, res) => {
+  const courseId = req.params.id; // Correct param from route /:id/sections/reorder
   const { sections } = req.body; // Expect array of { section_id, display_order }
+
   if (!sections || !Array.isArray(sections)) {
     return res.status(400).json({ success: false, message: "Invalid data" });
+  }
+
+  const course = await Course.findByPk(courseId);
+  if (!course) {
+    return res.status(404).json({ success: false, message: "Course not found" });
+  }
+
+  if (
+    req.user.role !== "system_admin" &&
+    req.user.id !== course.instructor_id
+  ) {
+    return res.status(403).json({ success: false, message: "Forbidden" });
   }
 
   // Transaction for safety
   await sequelize.transaction(async (t) => {
     for (const item of sections) {
+      if (!item.section_id || typeof item.display_order !== "number") continue;
+      
       await Section.update(
         { display_order: item.display_order },
-        { where: { section_id: item.section_id }, transaction: t }
+        { 
+          where: { 
+            section_id: item.section_id,
+            course_id: course.course_id // Ensure section belongs to this course
+          }, 
+          transaction: t 
+        }
       );
     }
   });

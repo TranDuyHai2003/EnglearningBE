@@ -17,24 +17,40 @@ const dropPatternIndex = async () => {
 };
 
 const up = async () => {
-  await queryInterface.addColumn("dict_entry", "headword_norm", {
-    type: DataTypes.TEXT,
-    allowNull: true,
-  });
+  const tableDescription = await queryInterface.describeTable("dict_entry");
 
-  await queryInterface.sequelize.query(
-    `UPDATE dict_entry
-     SET headword_norm = lower(regexp_replace(headword, '\\s+', ' ', 'g'))`
-  );
+  if (!tableDescription.headword_norm) {
+    await queryInterface.addColumn("dict_entry", "headword_norm", {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    });
 
-  await queryInterface.changeColumn("dict_entry", "headword_norm", {
-    type: DataTypes.TEXT,
-    allowNull: false,
-  });
+    await queryInterface.sequelize.query(
+      `UPDATE dict_entry
+       SET headword_norm = lower(regexp_replace(headword, '\\s+', ' ', 'g'))`
+    );
 
-  await queryInterface.addIndex("dict_entry", ["headword_norm"], {
-    name: "idx_dict_entry_headword_norm",
-  });
+    await queryInterface.changeColumn("dict_entry", "headword_norm", {
+      type: DataTypes.TEXT,
+      allowNull: false,
+    });
+    console.log("Column headword_norm added to dict_entry");
+  } else {
+    console.log("Column headword_norm already exists in dict_entry");
+  }
+
+  try {
+    await queryInterface.addIndex("dict_entry", ["headword_norm"], {
+      name: "idx_dict_entry_headword_norm",
+    });
+    console.log("Index idx_dict_entry_headword_norm added");
+  } catch (error) {
+    if (error.parent && error.parent.code === "42P07") {
+      console.log("Index idx_dict_entry_headword_norm already exists");
+    } else {
+      throw error;
+    }
+  }
 
   await addPatternIndex();
 };

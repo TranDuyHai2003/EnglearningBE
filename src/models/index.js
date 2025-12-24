@@ -299,4 +299,8 @@ module.exports = {
   TrackEnrollment,
   LiveSession,
   SessionRegistration,
+  FlashcardDeck,
+  Flashcard,
+  FlashcardUserState,
+  FlashcardReview,
 };

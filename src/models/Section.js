@@ -24,6 +24,15 @@ const Section = sequelize.define(
       type: DataTypes.INTEGER,
       defaultValue: 0,
     },
+    approval_status: {
+      type: DataTypes.ENUM("pending", "approved", "rejected"),
+      defaultValue: "pending",
+      allowNull: false,
+    },
+    rejection_reason: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
   },
   {
     tableName: "sections",
