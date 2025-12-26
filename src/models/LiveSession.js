@@ -46,6 +46,18 @@ const LiveSession = sequelize.define(
     meeting_link: {
       type: DataTypes.STRING,
     },
+    topic_id: {
+      type: DataTypes.INTEGER,
+      // Foreign key to LiveTopic (optional, can be null for Generic meetings)
+    },
+    max_capacity: {
+      type: DataTypes.INTEGER,
+      defaultValue: 10,
+    },
+    cost_in_credits: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0, // 0 for free sessions
+    },
     status: {
       type: DataTypes.ENUM("scheduled", "completed", "cancelled"),
       defaultValue: "scheduled",

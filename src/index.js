@@ -1,10 +1,10 @@
 const express = require("express");
-const http = require("http");
+const https = require("https");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const path = require("path");
-
+const fs = require("fs");
 const env = require("./config/env");
 const { initDatabase } = require("./config/database");
 require("./models");
@@ -28,10 +28,19 @@ const liveSessionRoutes = require("./routes/liveSessions");
 const { initLiveSocket } = require("./services/liveSessionSocket");
 const videoRoutes = require("./modules/videos/videos.routes");
 const flashcardRoutes = require("./modules/flashcards/flashcards.routes");
+
 const dictionaryRoutes = require("./modules/dictionary/dictionary.routes");
+const speakingRoutes = require("./routes/speaking");
+
 
 const app = express();
-const server = http.createServer(app);
+const server = https.createServer(
+  {
+    key: fs.readFileSync("./certs/key.pem"),
+    cert: fs.readFileSync("./certs/192.168.1.61+2.pem"),
+  },
+  app
+);
 
 app.use(helmet());
 app.use(cors({
@@ -54,6 +63,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/instructors", instructorRoutes);
 app.use("/api/courses", courseRoutes);
+app.use("/api/speaking", speakingRoutes);
+
 app.use("/api/courses", reviewRoutes);
 app.use("/api/learning", learningRoutes);
 app.use("/api/learning", discussionRoutes);

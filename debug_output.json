@@ -1,0 +1,55 @@
+{
+  "currentBalance": 160,
+  "transactions": [
+    {
+      "id": 169,
+      "code": "TXN-1766659027308-3",
+      "status": "completed",
+      "amount": "1800000.00",
+      "packageId": 2,
+      "packageName": "Pro Master",
+      "packageCredits": 20,
+      "session": "cs_test_a1NCax1JH4H2yrwslCgYuvtUdW0AejD3D4U6W17l3G3EFaHrmvOlrxWyID"
+    },
+    {
+      "id": 168,
+      "code": "TXN-1766658932992-3",
+      "status": "completed",
+      "amount": "500000.00",
+      "packageId": 1,
+      "packageName": "Starter Pack",
+      "packageCredits": 5,
+      "session": "cs_test_a1TDf6BgV18bk3Neo6AbH6TgswwMe8FMMGa8QuW1W2GNt52WsuwjoY51ln"
+    },
+    {
+      "id": 167,
+      "code": "TXN-1766658425224-3",
+      "status": "completed",
+      "amount": "1800000.00",
+      "packageId": 2,
+      "packageName": "Pro Master",
+      "packageCredits": 20,
+      "session": "cs_test_a1cDNDSMuxqX2FSZm4FXW7VqP0Je4IIWZWxR6Vb4m1NbA08EiqvVV4j5xW"
+    },
+    {
+      "id": 166,
+      "code": "TXN-1766658399668-3",
+      "status": "completed",
+      "amount": "500000.00",
+      "packageId": 1,
+      "packageName": "Starter Pack",
+      "packageCredits": 5,
+      "session": "cs_test_a1FfsQfR8nqK36KzhaGH8YNXUUE8W8sNwxycwVtZjyXxa4jcXNaDNGLa2a"
+    },
+    {
+      "id": 165,
+      "code": "TXN-1766658310089-3",
+      "status": "completed",
+      "amount": "500000.00",
+      "packageId": 1,
+      "packageName": "Starter Pack",
+      "packageCredits": 5,
+      "session": "cs_test_a1ec91c0NhkKT1yyntFlb3EYdu1OaqioE41Dnk0z5f8gIXDSuMierN1yH8"
+    }
+  ]
+}

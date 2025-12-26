@@ -15,7 +15,11 @@ const TransactionDetail = sequelize.define(
     },
     course_id: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true,
+    },
+    package_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
     },
     price: {
       type: DataTypes.DECIMAL(10, 2),

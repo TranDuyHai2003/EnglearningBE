@@ -23,16 +23,16 @@ const finalizeStripeTransaction = async (transaction, session) => {
 
     const detail = transaction.details?.[0];
     const courseId = detail?.course_id;
+    const packageId = detail?.package_id;
 
+    // Course Fulfillment
     if (courseId && transaction.student_id) {
       await Enrollment.findOrCreate({
         where: {
           student_id: transaction.student_id,
           course_id: courseId,
         },
-        defaults: {
-          status: "active",
-        },
+        defaults: { status: "active" },
       });
 
       let courseTitle = detail?.course?.title;
@@ -50,6 +50,28 @@ const finalizeStripeTransaction = async (transaction, session) => {
           is_read: false,
         });
       }
+    } 
+    // Package Fulfillment
+    else if (packageId && transaction.student_id) {
+       const { LiveCoursePackage, UserCredit } = require("../models");
+       const pkg = await LiveCoursePackage.findByPk(packageId);
+       
+       if (pkg) {
+          let credit = await UserCredit.findByPk(transaction.student_id);
+          if (!credit) {
+             credit = await UserCredit.create({ user_id: transaction.student_id, balance: 0 });
+          }
+          credit.balance += pkg.credits;
+          await credit.save();
+
+          await Notification.create({
+             user_id: transaction.student_id,
+             type: "payment",
+             title: "Mua gói Speaking thành công",
+             content: `Bạn đã nhận được ${pkg.credits} credits từ gói ${pkg.name}.`,
+             is_read: false,
+          });
+       }
     }
   }
 
@@ -58,7 +80,10 @@ const finalizeStripeTransaction = async (transaction, session) => {
       {
         model: TransactionDetail,
         as: "details",
-        include: [{ model: Course, as: "course" }],
+        include: [
+           { model: Course, as: "course" },
+           { model: require("../models").LiveCoursePackage, as: "package" }
+        ],
       },
     ],
   });
@@ -67,38 +92,62 @@ const finalizeStripeTransaction = async (transaction, session) => {
 };
 
 const createCheckoutSession = asyncHandler(async (req, res) => {
-  const { courseId } = req.body;
+  const { courseId, packageId } = req.body;
   const studentId = req.user.id;
 
-  const course = await Course.findByPk(courseId);
-  if (!course) {
-    return res
-      .status(404)
-      .json({ success: false, message: "Course not found" });
-  }
+  let item, price, title, description, imageUrl, type;
 
-  const existingEnrollment = await Enrollment.findOne({
-    where: { student_id: studentId, course_id: courseId },
-  });
-
-  if (existingEnrollment) {
-    return res.status(400).json({
-      success: false,
-      message: "Already enrolled in this course",
+  if (courseId) {
+    item = await Course.findByPk(courseId);
+    if (!item) return res.status(404).json({ success: false, message: "Course not found" });
+    
+    // Check existing enrollment
+    const existingEnrollment = await Enrollment.findOne({
+       where: { student_id: studentId, course_id: courseId },
     });
+    if (existingEnrollment) {
+       return res.status(400).json({ success: false, message: "Already enrolled in this course" });
+    }
+
+    type = 'course';
+    price = item.discount_price || item.price;
+    title = item.title;
+    description = item.description?.substring(0, 200);
+    imageUrl = item.thumbnail_url;
+  } else if (packageId) {
+    const { LiveCoursePackage } = require("../models");
+    item = await LiveCoursePackage.findByPk(packageId);
+    if (!item) return res.status(404).json({ success: false, message: "Package not found" });
+
+    type = 'package';
+    price = item.price; 
+    title = item.name;
+    description = item.description;
+    imageUrl = null; 
+  } else {
+    return res.status(400).json({ success: false, message: "No item specified" });
   }
 
-  const price = course.discount_price || course.price;
-  const amountInCents = Math.round(parseFloat(price) * 100);
+  console.log("Creating Checkout Session:", { type, price, title, studentId }); // DEBUG LOG
+
+  // Determine currency and unit amount
+  const currency = "vnd"; 
+  let amountForStripe;
+  
+  if (currency === "vnd") {
+      // VND is a zero-decimal currency, so we pass the amount directly without *100
+      amountForStripe = Math.round(parseFloat(price)); 
+  } else {
+      amountForStripe = Math.round(parseFloat(price) * 100);
+  }
 
   const transactionCode = `TXN-${Date.now()}-${studentId}`;
+  
   const transaction = await Transaction.create({
     student_id: studentId,
     transaction_code: transactionCode,
     total_amount: price,
-    discount_amount: course.discount_price
-      ? course.price - course.discount_price
-      : 0,
+    discount_amount: (type === 'course' && item.discount_price) ? item.price - item.discount_price : 0,
     final_amount: price,
     payment_method: "bank_card",
     payment_gateway: "stripe",
@@ -107,9 +156,10 @@ const createCheckoutSession = asyncHandler(async (req, res) => {
 
   await TransactionDetail.create({
     transaction_id: transaction.transaction_id,
-    course_id: courseId,
-    price: course.price,
-    discount: course.discount_price ? course.price - course.discount_price : 0,
+    course_id: type === 'course' ? item.course_id : null,
+    package_id: type === 'package' ? item.package_id : null,
+    price: item.price,
+    discount: (type === 'course' && item.discount_price) ? item.price - item.discount_price : 0,
     final_price: price,
   });
 
@@ -118,13 +168,13 @@ const createCheckoutSession = asyncHandler(async (req, res) => {
     line_items: [
       {
         price_data: {
-          currency: "usd",
+          currency: currency, 
           product_data: {
-            name: course.title,
-            description: course.description?.substring(0, 200),
-            images: course.thumbnail_url ? [course.thumbnail_url] : [],
+            name: title,
+            description: description,
+            images: imageUrl ? [imageUrl] : [],
           },
-          unit_amount: amountInCents,
+          unit_amount: amountForStripe,
         },
         quantity: 1,
       },
@@ -137,7 +187,9 @@ const createCheckoutSession = asyncHandler(async (req, res) => {
     metadata: {
       transaction_id: transaction.transaction_id,
       student_id: studentId,
-      course_id: courseId,
+      course_id: type === 'course' ? item.course_id : null,
+      package_id: type === 'package' ? item.package_id : null,
+      type: type 
     },
   });
 
@@ -205,7 +257,10 @@ const getSessionStatus = asyncHandler(async (req, res) => {
       {
         model: TransactionDetail,
         as: "details",
-        include: [{ model: Course, as: "course" }],
+        include: [
+           { model: Course, as: "course" },
+           { model: require("../models").LiveCoursePackage, as: "package" }
+        ],
       },
     ],
   });
@@ -401,21 +456,47 @@ const resumePayment = asyncHandler(async (req, res) => {
     }
   }
 
-  const course = await Course.findByPk(transaction.details[0].course_id);
-  const amountInCents = Math.round(parseFloat(transaction.final_amount) * 100);
+  let item, title, description, imageUrl, type;
+  const detail = transaction.details[0];
+
+  if (detail.course_id) {
+     item = await Course.findByPk(detail.course_id);
+     type = 'course';
+     title = item.title;
+     description = item.description?.substring(0, 200);
+     imageUrl = item.thumbnail_url;
+  } else if (detail.package_id) {
+     const { LiveCoursePackage } = require("../models");
+     item = await LiveCoursePackage.findByPk(detail.package_id);
+     type = 'package';
+     title = item.name;
+     description = item.description;
+     imageUrl = null;
+  }
+
+  // Determine currency and unit amount (VND support)
+  const currency = "vnd"; 
+  const price = transaction.final_amount;
+  let amountForStripe;
+  
+  if (currency === "vnd") {
+      amountForStripe = Math.round(parseFloat(price)); 
+  } else {
+      amountForStripe = Math.round(parseFloat(price) * 100);
+  }
 
   session = await stripe.checkout.sessions.create({
     payment_method_types: ["card"],
     line_items: [
       {
         price_data: {
-          currency: "usd",
+          currency: currency,
           product_data: {
-            name: course.title,
-            description: course.description?.substring(0, 200),
-            images: course.thumbnail_url ? [course.thumbnail_url] : [],
+            name: title,
+            description: description,
+            images: imageUrl ? [imageUrl] : [],
           },
-          unit_amount: amountInCents,
+          unit_amount: amountForStripe,
         },
         quantity: 1,
       },
@@ -428,7 +509,8 @@ const resumePayment = asyncHandler(async (req, res) => {
     metadata: {
       transaction_id: transaction.transaction_id,
       student_id: req.user.id,
-      course_id: course.course_id,
+      course_id: detail.course_id,
+      package_id: detail.package_id,
     },
   });
 

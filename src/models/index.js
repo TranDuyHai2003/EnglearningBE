@@ -35,6 +35,11 @@ const FlashcardDeck = require("./FlashcardDeck");
 const Flashcard = require("./Flashcard");
 const FlashcardUserState = require("./FlashcardUserState");
 const FlashcardReview = require("./FlashcardReview");
+const LiveCoursePackage = require("./LiveCoursePackage");
+const UserCredit = require("./UserCredit");
+const LiveCurriculum = require("./LiveCurriculum");
+const LiveTopic = require("./LiveTopic");
+const Booking = require("./Booking");
 
 User.hasOne(InstructorProfile, {
   foreignKey: "user_id",
@@ -82,6 +87,7 @@ TrackEnrollment.belongsTo(Track, { foreignKey: "track_id", as: "track" });
 TrackEnrollment.belongsTo(User, { foreignKey: "student_id", as: "student" });
 User.hasMany(TrackEnrollment, { foreignKey: "student_id", as: "trackEnrollments" });
 
+// Live Session & Speaking Booking System
 LiveSession.belongsTo(Course, { foreignKey: "course_id", as: "course" });
 Course.hasMany(LiveSession, { foreignKey: "course_id", as: "liveSessions" });
 LiveSession.belongsTo(User, { foreignKey: "instructor_id", as: "instructor" });
@@ -103,6 +109,22 @@ User.hasMany(SessionRegistration, {
   foreignKey: "student_id",
   as: "sessionRegistrations",
 });
+
+// New Speaking Club Associations
+LiveCurriculum.hasMany(LiveTopic, { foreignKey: "curriculum_id", as: "topics" });
+LiveTopic.belongsTo(LiveCurriculum, { foreignKey: "curriculum_id", as: "curriculum" });
+
+LiveSession.belongsTo(LiveTopic, { foreignKey: "topic_id", as: "topic" });
+LiveTopic.hasMany(LiveSession, { foreignKey: "topic_id", as: "sessions" });
+
+Booking.belongsTo(User, { foreignKey: "user_id", as: "student" });
+User.hasMany(Booking, { foreignKey: "user_id", as: "bookings" });
+Booking.belongsTo(LiveSession, { foreignKey: "session_id", as: "session" });
+LiveSession.hasMany(Booking, { foreignKey: "bookings", as: "bookings" });
+
+User.hasOne(UserCredit, { foreignKey: "user_id", as: "credit" });
+UserCredit.belongsTo(User, { foreignKey: "user_id", as: "user" });
+
 
 Lesson.hasOne(Quiz, { foreignKey: "lesson_id", as: "quiz" });
 Quiz.belongsTo(Lesson, { foreignKey: "lesson_id", as: "lesson" });
@@ -202,6 +224,8 @@ TransactionDetail.belongsTo(Transaction, {
   as: "transaction",
 });
 TransactionDetail.belongsTo(Course, { foreignKey: "course_id", as: "course" });
+TransactionDetail.belongsTo(LiveCoursePackage, { foreignKey: "package_id", as: "package" });
+
 
 User.hasMany(FlashcardDeck, {
   foreignKey: "owner_user_id",
@@ -303,4 +327,9 @@ module.exports = {
   Flashcard,
   FlashcardUserState,
   FlashcardReview,
+  LiveCoursePackage,
+  UserCredit,
+  LiveCurriculum,
+  LiveTopic,
+  Booking
 };
