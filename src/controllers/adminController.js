@@ -500,6 +500,11 @@ const approveCourse = asyncHandler(async (req, res) => {
     published_at: new Date(),
   });
 
+  await Section.update(
+    { approval_status: "approved" },
+    { where: { course_id: course.course_id } }
+  );
+
   await Notification.create({
     user_id: course.instructor_id,
     type: "course",

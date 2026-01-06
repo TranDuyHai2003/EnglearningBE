@@ -1,5 +1,5 @@
 const express = require("express");
-const https = require("https");
+const http = require("http");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
@@ -34,11 +34,7 @@ const speakingRoutes = require("./routes/speaking");
 
 
 const app = express();
-const server = https.createServer(
-  {
-    key: fs.readFileSync("./certs/key.pem"),
-    cert: fs.readFileSync("./certs/192.168.1.61+2.pem"),
-  },
+const server = http.createServer(
   app
 );
 

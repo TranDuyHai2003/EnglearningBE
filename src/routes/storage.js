@@ -6,7 +6,11 @@ const { authMiddleware } = require("../middleware/auth");
 const { allowRoles } = require("../middleware/roles");
 const {
   uploadLectureVideo,
+  uploadCourseThumbnail,
   getLecturePlaybackUrl,
+  serveCourseThumbnail,
+  uploadLessonDocument,
+  getLessonDocumentUrl,
 } = require("../controllers/storageController");
 const env = require("../config/env");
 
@@ -41,6 +45,25 @@ router.post(
   uploadLectureVideo
 );
 
+router.post(
+  "/upload/thumbnail",
+  authMiddleware,
+  allowRoles("instructor", "support_admin", "system_admin"),
+  upload.single("file"),
+  uploadCourseThumbnail
+);
+
+router.post(
+  "/upload/document",
+  authMiddleware,
+  allowRoles("instructor", "support_admin", "system_admin"),
+  upload.single("file"),
+  uploadLessonDocument
+);
+
 router.get("/lecture/url", authMiddleware, getLecturePlaybackUrl);
+router.get("/document/url", authMiddleware, getLessonDocumentUrl);
+
+router.get("/courses/:courseId/thumbnails/:filename", serveCourseThumbnail);
 
 module.exports = router;

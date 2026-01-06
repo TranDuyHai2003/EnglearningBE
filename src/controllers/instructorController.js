@@ -128,7 +128,8 @@ const listProfiles = asyncHandler(async (req, res) => {
 });
 
 const reviewProfile = asyncHandler(async (req, res) => {
-  const { status, reason, interview_notes, interview_date } = req.body;
+  const { status, reason, interview_notes, interview_date, meeting_link } =
+    req.body;
 
   if (!["approved", "rejected", "interviewing", "pending"].includes(status)) {
     return res.status(400).json({ success: false, message: "Invalid status" });
@@ -148,6 +149,7 @@ const reviewProfile = asyncHandler(async (req, res) => {
     rejection_reason: status === "rejected" ? reason : null,
     interview_notes: interview_notes ?? profile.interview_notes,
     interview_date: interview_date ?? profile.interview_date,
+    meeting_link: meeting_link ?? profile.meeting_link,
   });
 
   if (status === "approved") {
@@ -170,8 +172,10 @@ const reviewProfile = asyncHandler(async (req, res) => {
   } else if (status === "interviewing") {
     notifTitle = "Mời phỏng vấn";
     notifContent = `Bạn có lịch phỏng vấn vào ${
-      interview_date || "sớm nhất"
-    }. Ghi chú: ${interview_notes}`;
+      interview_date ? new Date(interview_date).toLocaleString() : "sớm nhất"
+    }. ${
+      meeting_link ? `Link họp: ${meeting_link}. ` : ""
+    }Ghi chú: ${interview_notes}`;
   }
 
   if (notifTitle) {

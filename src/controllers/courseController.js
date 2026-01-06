@@ -402,6 +402,10 @@ const createSection = asyncHandler(async (req, res) => {
     title: req.body.title,
     description: req.body.description,
     display_order: req.body.display_order ?? nextOrder,
+    approval_status:
+      ["system_admin", "support_admin"].includes(req.user.role)
+        ? "approved"
+        : "pending",
   });
 
   res.status(201).json({ success: true, data: section });

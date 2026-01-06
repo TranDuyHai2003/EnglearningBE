@@ -66,6 +66,26 @@ const Lesson = sequelize.define(
       type: DataTypes.INTEGER,
       defaultValue: 0,
     },
+    // Document fields
+    document_url: {
+      type: DataTypes.STRING,
+    },
+    document_bucket: {
+      type: DataTypes.STRING,
+    },
+    document_key: {
+      type: DataTypes.STRING,
+    },
+    document_mime_type: {
+      type: DataTypes.STRING,
+      defaultValue: "application/pdf",
+    },
+    document_size_bytes: {
+      type: DataTypes.BIGINT,
+    },
+    document_uploaded_at: {
+      type: DataTypes.DATE,
+    },
     content: {
       type: DataTypes.TEXT,
     },

@@ -81,9 +81,19 @@ const getPresignedUrl = async ({ bucket, key, expiresIn }) => {
   return getSignedUrl(s3Client, command, { expiresIn });
 };
 
+const getFileStream = async ({ bucket, key }) => {
+  const command = new GetObjectCommand({
+    Bucket: bucket,
+    Key: key,
+  });
+  const response = await s3Client.send(command);
+  return response;
+};
+
 module.exports = {
   s3Client,
   ensureBucketExists,
   uploadObject,
   getPresignedUrl,
+  getFileStream,
 };
