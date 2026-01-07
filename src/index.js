@@ -38,7 +38,9 @@ const server = http.createServer(
   app
 );
 
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+}));
 app.use(cors({
   origin: [env.FRONTEND_URL, "http://localhost:3000", "http://127.0.0.1:3000"],
   credentials: true

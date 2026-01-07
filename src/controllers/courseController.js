@@ -370,6 +370,14 @@ const deleteCourse = asyncHandler(async (req, res) => {
     return res.status(403).json({ success: false, message: "Forbidden" });
   }
 
+  // Prevent instructors from deleting approved courses
+  if (req.user.role === "instructor" && course.approval_status === "approved") {
+    return res.status(403).json({
+      success: false,
+      message: "Bạn không thể xóa khóa học đã được duyệt. Vui lòng liên hệ quản trị viên.",
+    });
+  }
+
   await course.destroy();
   res.json({ success: true, message: "Course removed" });
 });

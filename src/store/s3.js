@@ -22,14 +22,14 @@ const s3Client = new S3Client({
 
   // 🔥 FIX ECONNRESET
   requestHandler: new NodeHttpHandler({
-    connectionTimeout: 30000,
-    socketTimeout: 30000,
+    connectionTimeout: 300000, 
+    socketTimeout: 300000,
     httpAgent: new http.Agent({
       keepAlive: false, // 🔥 RẤT QUAN TRỌNG
     }),
   }),
 
-  maxAttempts: 1, // không retry
+  maxAttempts: 3, // Retry enabled for stability
 });
 
 

@@ -10,6 +10,9 @@ const {
   SupportTicket,
   SupportReply,
   Notification,
+  Quiz,
+  Question,
+  AnswerOption,
   sequelize,
 } = require("../models");
 const asyncHandler = require("../utils/asyncHandler");
@@ -462,6 +465,17 @@ const getPendingLessons = asyncHandler(async (req, res) => {
                 attributes: ["user_id", "full_name"],
               },
             ],
+          },
+        ],
+      },
+      {
+        model: Quiz,
+        as: "quiz",
+        include: [
+          {
+            model: Question,
+            as: "questions",
+            include: [{ model: AnswerOption, as: "options" }],
           },
         ],
       },

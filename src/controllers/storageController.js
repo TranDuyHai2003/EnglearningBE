@@ -394,8 +394,9 @@ const serveCourseThumbnail = asyncHandler(async (req, res) => {
   }
 });
 
-const getLessonDocumentUrl = asyncHandler(async (req, res) => {
+const getLessonDocumentUrl = asyncHandler(async (req, res) => { // Line 397
   const { lessonId } = req.query;
+  console.log(`[getLessonDocumentUrl] Request for lessonId: ${lessonId}`);
 
   if (!lessonId) {
     return res.status(400).json({ success: false, message: "lessonId is required" });
@@ -411,14 +412,23 @@ const getLessonDocumentUrl = asyncHandler(async (req, res) => {
     ],
   });
 
-  if (!lesson || !lesson.section || !lesson.section.course) {
-    return res.status(404).json({ success: false, message: "Lesson not found" });
+  if (!lesson) {
+      console.log(`[getLessonDocumentUrl] Lesson ${lessonId} not found in DB`);
+      return res.status(404).json({ success: false, message: "Lesson not found" });
+  }
+  
+  if (!lesson.section || !lesson.section.course) {
+    console.log(`[getLessonDocumentUrl] Lesson ${lessonId} missing section or course relations`);
+    return res.status(404).json({ success: false, message: "Lesson data incomplete (missing section/course)" });
   }
 
   const course = lesson.section.course;
   const bucket = lesson.document_bucket || env.S3_VIDEO_BUCKET;
 
+  console.log(`[getLessonDocumentUrl] Found lesson ${lessonId}, document_key: ${lesson.document_key}`);
+
   if (!lesson.document_key) {
+    console.warn(`[getLessonDocumentUrl] Lesson ${lessonId} has no document_key`);
     return res.status(404).json({ success: false, message: "No document found for this lesson" });
   }
 
