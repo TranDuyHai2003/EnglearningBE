@@ -422,17 +422,27 @@ const startQuizAttempt = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: "Quiz not found" });
   }
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   const attempts = await QuizAttempt.count({
-    where: { quiz_id: quiz.quiz_id, student_id: req.user.id },
+    where: {
+      quiz_id: quiz.quiz_id,
+      student_id: req.user.id,
+      started_at: {
+        [Op.gte]: today,
+      },
+    },
   });
 
-  const allowedAttempts = Math.max(quiz.max_attempts || 0, 3);
-  if (allowedAttempts && attempts >= allowedAttempts) {
-    return res.status(400).json({
-      success: false,
-      message: "Attempt limit reached",
-      code: "ATTEMPT_LIMIT_REACHED",
-    });
+  if (quiz.max_attempts && quiz.max_attempts > 0) {
+    if (attempts >= quiz.max_attempts) {
+      return res.status(400).json({
+        success: false,
+        message: "Attempt limit reached",
+        code: "ATTEMPT_LIMIT_REACHED",
+      });
+    }
   }
 
   const attempt = await QuizAttempt.create({

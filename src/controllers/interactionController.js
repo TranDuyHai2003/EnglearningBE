@@ -22,6 +22,7 @@ const createDiscussion = asyncHandler(async (req, res) => {
   const discussion = await QaDiscussion.create({
     lesson_id: lesson.lesson_id,
     student_id: req.user.id,
+    title: req.body.title || (req.body.content ? req.body.content.substring(0, 50) + (req.body.content.length > 50 ? "..." : "") : "Discussion"),
     content: req.body.content,
   });
 
