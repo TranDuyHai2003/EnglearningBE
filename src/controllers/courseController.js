@@ -11,6 +11,17 @@ const {
   User,
   Enrollment,
   Track,
+  LessonProgress,
+  Quiz,
+  QaDiscussion,
+  QaReply,
+  FlashcardDeck,
+  TrackLesson,
+  Flashcard,
+  QuizAttempt,
+  StudentAnswer,
+  Question,
+  AnswerOption,
 } = require("../models");
 const asyncHandler = require("../utils/asyncHandler");
 const { getPagination } = require("../utils/pagination");
@@ -124,9 +135,32 @@ const listCourses = asyncHandler(async (req, res) => {
     distinct: true,
   });
 
+  // Convert to JSON to attach custom properties
+  const courses = result.rows.map((c) => c.toJSON());
+
+  // If user is logged in, check enrollment status
+  if (req.user) {
+    const courseIds = courses.map((c) => c.course_id);
+    if (courseIds.length > 0) {
+      const enrollments = await Enrollment.findAll({
+        where: {
+          student_id: req.user.id,
+          course_id: { [Op.in]: courseIds },
+          status: { [Op.in]: ["active", "completed"] },
+        },
+        attributes: ["course_id"],
+      });
+
+      const enrolledSet = new Set(enrollments.map((e) => e.course_id));
+      courses.forEach((c) => {
+        c.is_enrolled = enrolledSet.has(c.course_id);
+      });
+    }
+  }
+
   res.json({
     success: true,
-    data: result.rows,
+    data: courses,
     meta: {
       total: result.count,
       page,
@@ -254,9 +288,12 @@ const getCourse = asyncHandler(async (req, res) => {
 
   // Determine if user has privileged access to this course
   const userRole = req.user?.role;
-  const isAdmin = ["system_admin", "support_admin", "content_admin"].includes(userRole);
-  const isOwner = userRole === "instructor" && req.user.id === course.instructor_id;
-  
+  const isAdmin = ["system_admin", "support_admin", "content_admin"].includes(
+    userRole
+  );
+  const isOwner =
+    userRole === "instructor" && req.user.id === course.instructor_id;
+
   const canViewHidden = isAdmin || isOwner;
 
   // If not privileged, ensure course is published
@@ -284,14 +321,16 @@ const getCourse = asyncHandler(async (req, res) => {
   }
 
   const courseData = course.toJSON();
-  
+
   // Filter hidden lessons and sections for non-privileged users
   if (!canViewHidden) {
     courseData.sections = courseData.sections
-      .filter(section => section.approval_status === 'approved')
-      .map(section => ({
+      .filter((section) => section.approval_status === "approved")
+      .map((section) => ({
         ...section,
-        lessons: section.lessons.filter(lesson => lesson.approval_status === 'approved')
+        lessons: section.lessons.filter(
+          (lesson) => lesson.approval_status === "approved"
+        ),
       }));
   }
 
@@ -374,7 +413,8 @@ const deleteCourse = asyncHandler(async (req, res) => {
   if (req.user.role === "instructor" && course.approval_status === "approved") {
     return res.status(403).json({
       success: false,
-      message: "Bạn không thể xóa khóa học đã được duyệt. Vui lòng liên hệ quản trị viên.",
+      message:
+        "Bạn không thể xóa khóa học đã được duyệt. Vui lòng liên hệ quản trị viên.",
     });
   }
 
@@ -397,23 +437,20 @@ const createSection = asyncHandler(async (req, res) => {
     return res.status(403).json({ success: false, message: "Forbidden" });
   }
 
-  // Calculate the next display_order
   const maxOrder = await Section.max("display_order", {
     where: { course_id: course.course_id },
   });
-  
-  // If maxOrder is null (no sections), start at 0 (or 1). If not null, increment.
-  const nextOrder = (maxOrder !== null && !isNaN(maxOrder)) ? maxOrder + 1 : 0;
+
+  const nextOrder = maxOrder !== null && !isNaN(maxOrder) ? maxOrder + 1 : 0;
 
   const section = await Section.create({
     course_id: course.course_id,
     title: req.body.title,
     description: req.body.description,
     display_order: req.body.display_order ?? nextOrder,
-    approval_status:
-      ["system_admin", "support_admin"].includes(req.user.role)
-        ? "approved"
-        : "pending",
+    approval_status: ["system_admin", "support_admin"].includes(req.user.role)
+      ? "approved"
+      : "pending",
   });
 
   res.status(201).json({ success: true, data: section });
@@ -496,6 +533,12 @@ const createLesson = asyncHandler(async (req, res) => {
     return res.status(403).json({ success: false, message: "Forbidden" });
   }
 
+  const maxOrder = await Lesson.max("display_order", {
+    where: { section_id: section.section_id },
+  });
+
+  const nextOrder = maxOrder !== null && !isNaN(maxOrder) ? maxOrder + 1 : 0;
+
   const lesson = await Lesson.create({
     section_id: section.section_id,
     title: req.body.title,
@@ -510,11 +553,13 @@ const createLesson = asyncHandler(async (req, res) => {
     video_duration: req.body.video_duration,
     content: req.body.content,
     allow_preview: req.body.allow_preview,
-    display_order: req.body.display_order,
-    approval_status:
-      ["system_admin", "support_admin"].includes(req.user.role)
-        ? "approved"
-        : "pending",
+    display_order:
+      req.body.display_order && req.body.display_order > 0
+        ? req.body.display_order
+        : nextOrder,
+    approval_status: ["system_admin", "support_admin"].includes(req.user.role)
+      ? "approved"
+      : "pending",
   });
 
   res.status(201).json({ success: true, data: lesson });
@@ -588,7 +633,118 @@ const deleteLesson = asyncHandler(async (req, res) => {
     return res.status(403).json({ success: false, message: "Forbidden" });
   }
 
-  await lesson.destroy();
+  // Use transaction to ensure all related data is deleted or nothing is
+  await sequelize.transaction(async (t) => {
+    const lessonId = lesson.lesson_id;
+
+    // 1. Delete Lesson Progress
+    await LessonProgress.destroy({
+      where: { lesson_id: lessonId },
+      transaction: t,
+    });
+
+    // 2. Delete Lesson Resources
+    await LessonResource.destroy({
+      where: { lesson_id: lessonId },
+      transaction: t,
+    });
+
+    // 3. Delete Track Lesson mappings
+    await TrackLesson.destroy({
+      where: { lesson_id: lessonId },
+      transaction: t,
+    });
+
+    // 4. Delete Flashcard Decks and Cards
+    const decks = await FlashcardDeck.findAll({
+      where: { lesson_id: lessonId },
+      attributes: ["id"],
+      transaction: t,
+    });
+    const deckIds = decks.map((d) => d.id);
+    if (deckIds.length > 0) {
+      await Flashcard.destroy({
+        where: { deck_id: deckIds },
+        transaction: t,
+      });
+      await FlashcardDeck.destroy({
+        where: { id: deckIds },
+        transaction: t,
+      });
+    }
+
+    // 5. Delete Discussions and Replies
+    const discussions = await QaDiscussion.findAll({
+      where: { lesson_id: lessonId },
+      attributes: ["discussion_id"],
+      transaction: t,
+    });
+    const discussionIds = discussions.map((d) => d.discussion_id);
+    if (discussionIds.length > 0) {
+      await QaReply.destroy({
+        where: { discussion_id: discussionIds },
+        transaction: t,
+      });
+      await QaDiscussion.destroy({
+        where: { discussion_id: discussionIds },
+        transaction: t,
+      });
+    }
+
+    // 6. Delete Quizzes (Attempts -> Answers, Questions -> Options)
+    const quizzes = await Quiz.findAll({
+      where: { lesson_id: lessonId },
+      attributes: ["quiz_id"],
+      transaction: t,
+    });
+
+    for (const quiz of quizzes) {
+      const quizId = quiz.quiz_id;
+
+      // Delete Attempts and Student Answers
+      const attempts = await QuizAttempt.findAll({
+        where: { quiz_id: quizId },
+        attributes: ["attempt_id"],
+        transaction: t,
+      });
+      const attemptIds = attempts.map((a) => a.attempt_id);
+      if (attemptIds.length > 0) {
+        await StudentAnswer.destroy({
+          where: { attempt_id: attemptIds },
+          transaction: t,
+        });
+        await QuizAttempt.destroy({
+          where: { attempt_id: attemptIds },
+          transaction: t,
+        });
+      }
+
+      // Delete Questions and Options
+      const questions = await Question.findAll({
+        where: { quiz_id: quizId },
+        attributes: ["question_id"],
+        transaction: t,
+      });
+      const questionIds = questions.map((q) => q.question_id);
+      if (questionIds.length > 0) {
+        await AnswerOption.destroy({
+          where: { question_id: questionIds },
+          transaction: t,
+        });
+        await Question.destroy({
+          where: { question_id: questionIds },
+          transaction: t,
+        });
+      }
+
+      // Delete the Quiz itself
+      await quiz.destroy({ transaction: t });
+    }
+
+    // Finally, delete the lesson
+    await lesson.destroy({ transaction: t });
+  });
+
   res.json({ success: true, message: "Lesson removed" });
 });
 
@@ -742,7 +898,9 @@ const reorderSections = asyncHandler(async (req, res) => {
 
   const course = await Course.findByPk(courseId);
   if (!course) {
-    return res.status(404).json({ success: false, message: "Course not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Course not found" });
   }
 
   if (
@@ -756,15 +914,15 @@ const reorderSections = asyncHandler(async (req, res) => {
   await sequelize.transaction(async (t) => {
     for (const item of sections) {
       if (!item.section_id || typeof item.display_order !== "number") continue;
-      
+
       await Section.update(
         { display_order: item.display_order },
-        { 
-          where: { 
+        {
+          where: {
             section_id: item.section_id,
-            course_id: course.course_id // Ensure section belongs to this course
-          }, 
-          transaction: t 
+            course_id: course.course_id, // Ensure section belongs to this course
+          },
+          transaction: t,
         }
       );
     }

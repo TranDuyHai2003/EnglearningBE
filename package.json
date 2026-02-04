@@ -1,9 +1,9 @@
 {
-  "name": "engbreaking-backend",
+  "type": "module",
+  "name": "englearning-backend",
   "version": "1.0.0",
   "description": "E-Learning Platform Backend",
   "main": "src/index.js",
-  "type": "commonjs",
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
@@ -40,6 +40,8 @@
     "zod": "^4.2.1"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "eslint-plugin-unused-imports": "^4.3.0",
     "jest": "^30.2.0",
     "nodemon": "^3.1.10"
   }

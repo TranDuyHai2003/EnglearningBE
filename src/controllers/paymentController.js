@@ -141,6 +141,17 @@ const createCheckoutSession = asyncHandler(async (req, res) => {
       amountForStripe = Math.round(parseFloat(price) * 100);
   }
 
+  // VALIDATION: Stripe requires a minimum amount (approx $0.50 USD)
+  // For VND, we enforce a minimum of 15,000 VND to be safe.
+  if (currency === "vnd" && amountForStripe < 15000) {
+      // In development/test mode, we can auto-adjust or just return error.
+      // Returning error is safer to avoid confusion.
+      return res.status(400).json({ 
+          success: false, 
+          message: `Số tiền thanh toán quá nhỏ (${amountForStripe}đ). Vui lòng cập nhật giá khóa học tối thiểu 15.000đ để thanh toán qua Stripe.` 
+      });
+  }
+
   const transactionCode = `TXN-${Date.now()}-${studentId}`;
   
   const transaction = await Transaction.create({
@@ -483,6 +494,13 @@ const resumePayment = asyncHandler(async (req, res) => {
       amountForStripe = Math.round(parseFloat(price)); 
   } else {
       amountForStripe = Math.round(parseFloat(price) * 100);
+  }
+
+  if (currency === "vnd" && amountForStripe < 15000) {
+      return res.status(400).json({ 
+          success: false, 
+          message: `Số tiền thanh toán quá nhỏ (${amountForStripe}đ). Vui lòng cập nhật giá khóa học tối thiểu 15.000đ để thanh toán qua Stripe.` 
+      });
   }
 
   session = await stripe.checkout.sessions.create({
